@@ -64,6 +64,22 @@ class SchedulerConfig:
 
 
 @dataclass
+class KeywordsConfig:
+    """Keywords configuration."""
+
+    file: str = "./keywords.txt"
+    max_keywords: int = 100
+
+
+@dataclass
+class OutputConfig:
+    """Output configuration."""
+
+    dir: str = "./output"
+    filename: str = "repositories.md"
+
+
+@dataclass
 class Config:
     """Main configuration."""
 
@@ -72,6 +88,8 @@ class Config:
     scrape: ScrapeConfigYaml = field(default_factory=ScrapeConfigYaml)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
+    keywords: KeywordsConfig = field(default_factory=KeywordsConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
 
 
 def _substitute_env_vars(value: str) -> str:
@@ -146,10 +164,24 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         workers=scheduler_dict.get("workers", 4),
     )
 
+    keywords_dict = processed_config.get("keywords", {})
+    keywords_config = KeywordsConfig(
+        file=keywords_dict.get("file", "./keywords.txt"),
+        max_keywords=keywords_dict.get("max_keywords", 100),
+    )
+
+    output_dict = processed_config.get("output", {})
+    output_config = OutputConfig(
+        dir=output_dict.get("dir", "./output"),
+        filename=output_dict.get("filename", "repositories.md"),
+    )
+
     return Config(
         github=github,
         filter=filter_config,
         scrape=scrape_config,
         database=database_config,
         scheduler=scheduler_config,
+        keywords=keywords_config,
+        output=output_config,
     )

@@ -62,3 +62,13 @@ database:
 scheduler:
   enabled: true
   workers: 4
+
+# Keywords configuration
+keywords:
+  file: ./keywords.txt
+  max_keywords: 100
+
+# Output configuration
+output:
+  dir: ./output
+  filename: repositories.md
