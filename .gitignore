@@ -49,3 +49,7 @@ output.txt
 # Go
 cmd/scheduler/scheduler
 cmd/scheduler/scheduler.exe
+
+# Generated files
+keywords.txt
+output/
