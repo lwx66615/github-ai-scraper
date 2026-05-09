@@ -1,0 +1,64 @@
+# GitHub AI Scraper Configuration
+
+# GitHub API configuration
+github:
+  token: ${GITHUB_TOKEN}  # Set via environment variable
+  cache_ttl: 3600         # Cache TTL in seconds (1 hour)
+
+# Filter configuration
+filter:
+  min_stars: 100
+  keywords:
+    - ai
+    - artificial intelligence
+    - machine learning
+    - deep learning
+    - neural network
+    - llm
+    - gpt
+    - transformer
+    - nlp
+    - computer vision
+    - reinforcement learning
+    - pytorch
+    - tensorflow
+    - huggingface
+  topics:
+    - ai
+    - machine-learning
+    - deep-learning
+    - neural-network
+    - natural-language-processing
+    - computer-vision
+    - llm
+    - gpt
+    - pytorch
+    - tensorflow
+    - huggingface
+    - openai
+    - langchain
+  languages: []  # Empty means all languages
+  exclude_keywords:
+    - awesome
+    - list
+    - curated
+
+# Scrape configuration
+scrape:
+  data_fields:
+    - stars
+    - language
+    - topics
+    - contributors
+  max_results: 500
+  concurrency: 5
+  cache_ttl: 3600
+
+# Database configuration
+database:
+  path: ./data/ai_scraper.db
+
+# Go scheduler configuration
+scheduler:
+  enabled: true
+  workers: 4
