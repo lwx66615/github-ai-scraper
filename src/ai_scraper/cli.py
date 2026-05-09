@@ -15,7 +15,9 @@ from ai_scraper import __version__
 from ai_scraper.api.github import GitHubClient
 from ai_scraper.config import Config, load_config
 from ai_scraper.filters.ai_filter import AIFilter
+from ai_scraper.keywords.extractor import KeywordExtractor
 from ai_scraper.models.repository import FilterConfig as FilterConfigModel
+from ai_scraper.output.markdown import MarkdownExporter
 from ai_scraper.storage.database import Database
 
 # Create console with UTF-8 encoding for Windows
@@ -75,6 +77,14 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
         db = Database(Path(config.database.path))
         db.init_db()
         filter_instance = AIFilter()
+        keyword_extractor = KeywordExtractor(
+            Path(config.keywords.file),
+            max_keywords=config.keywords.max_keywords
+        )
+        markdown_exporter = MarkdownExporter(
+            Path(config.output.dir),
+            filename=config.output.filename
+        )
 
         try:
             # Build search query
@@ -120,6 +130,18 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
 
                 if len(repos) < per_page:
                     break
+
+            if all_repos:
+                console.print("[dim]Extracting keywords...[/dim]")
+                existing_keywords = keyword_extractor.load_keywords()
+                new_keywords = keyword_extractor.extract_from_repos(all_repos)
+                merged = keyword_extractor.merge_keywords(existing_keywords, new_keywords)
+                keyword_extractor.save_keywords(merged)
+                console.print(f"[dim]Keywords updated: {len(merged)} total[/dim]")
+
+                console.print("[dim]Generating Markdown report...[/dim]")
+                output_path = markdown_exporter.export_repositories(all_repos)
+                console.print(f"[dim]Report saved to: {output_path}[/dim]")
 
             console.print(f"[bold green]Scraped {len(all_repos)} AI repositories[/bold green]")
 
@@ -358,6 +380,64 @@ def db_export(ctx: click.Context, format: str, output: str):
 
 
 cli.add_command(db_cmd, name="db")
+
+
+@cli.group()
+def keywords_cmd():
+    """Keywords management."""
+    pass
+
+
+@keywords_cmd.command("list")
+@click.pass_context
+def keywords_list(ctx: click.Context):
+    """List all keywords."""
+    config: Config = ctx.obj["config"]
+    extractor = KeywordExtractor(Path(config.keywords.file))
+    keywords = extractor.get_keywords_for_search()
+    if not keywords:
+        console.print("[yellow]No keywords found.[/yellow]")
+        return
+    console.print(f"[bold]Keywords ({len(keywords)}):[/bold]")
+    for kw in sorted(keywords):
+        console.print(f"  {kw}")
+
+
+@keywords_cmd.command("extract")
+@click.pass_context
+def keywords_extract(ctx: click.Context):
+    """Manually extract keywords from existing database."""
+    config: Config = ctx.obj["config"]
+    if not Path(config.database.path).exists():
+        console.print("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
+        return
+    db = Database(Path(config.database.path))
+    db.init_db()
+    repos = db.get_all_repositories(limit=10000)
+    db.close()
+    if not repos:
+        console.print("[yellow]No repositories in database.[/yellow]")
+        return
+    extractor = KeywordExtractor(Path(config.keywords.file), max_keywords=config.keywords.max_keywords)
+    existing = extractor.load_keywords()
+    new = extractor.extract_from_repos(repos)
+    merged = extractor.merge_keywords(existing, new)
+    extractor.save_keywords(merged)
+    console.print(f"[green]Extracted {len(new)} new keywords[/green]")
+    console.print(f"[green]Total: {len(merged)} keywords[/green]")
+
+
+@keywords_cmd.command("clear")
+@click.pass_context
+def keywords_clear(ctx: click.Context):
+    """Clear all keywords."""
+    config: Config = ctx.obj["config"]
+    extractor = KeywordExtractor(Path(config.keywords.file))
+    extractor.save_keywords(set())
+    console.print("[green]Keywords cleared.[/green]")
+
+
+cli.add_command(keywords_cmd, name="keywords")
 
 
 def main():
