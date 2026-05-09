@@ -5,11 +5,12 @@ A CLI tool for scraping AI-related high-star repositories from GitHub.
 ## Features
 
 - Search and filter AI-related repositories by keywords and topics
+- **Dynamic keyword extraction** - Automatically learns new keywords from scraped repos
+- **Markdown report generation** - Generates readable reports in `output/repositories.md`
 - Local SQLite storage with trend analysis
 - Configurable filtering and scraping options
 - Rate limiting with GitHub API token support
 - Export to CSV/JSON formats
-- Go-based high-performance scheduler (optional)
 
 ## Installation
 
@@ -69,11 +70,13 @@ database:
 | `ai-scraper scrape` | Scrape AI repositories from GitHub |
 | `ai-scraper list` | List scraped repositories |
 | `ai-scraper trending` | Show trending repositories by star growth |
+| `ai-scraper keywords list` | List all keywords |
+| `ai-scraper keywords extract` | Extract keywords from database |
+| `ai-scraper keywords clear` | Clear keywords |
 | `ai-scraper config init` | Initialize config file |
 | `ai-scraper config show` | Show current config |
 | `ai-scraper db stats` | Show database statistics |
 | `ai-scraper db export` | Export data to CSV/JSON |
-| `ai-scraper db clean` | Clean old snapshots |
 
 ## Project Structure
 
