@@ -1,4 +1,4 @@
-module github-ai-scraper/scheduler
+module github-ai-scraper/cmd/scheduler
 
 go 1.21
 
