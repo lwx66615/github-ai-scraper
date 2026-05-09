@@ -9,35 +9,32 @@
 
 ## 任务进度
 
-### 已完成 (5/10)
-
-| 任务 | 状态 | 提交SHA | 描述 |
-|------|------|---------|------|
-| Task 1 | ✅ 完成 | `2d3adf9`, `59d2e1b` | 项目初始化 (pyproject.toml, go.mod, 目录结构) |
-| Task 2 | ✅ 完成 | `14f8d39` | 数据模型定义 (Repository, RepoSnapshot, FilterConfig, ScrapeConfig) |
-| Task 3 | ✅ 完成 | `e829e10` | 配置管理模块 (YAML配置, 环境变量替换) |
-| Task 4 | ✅ 完成 | `4a79d60` | AI过滤器实现 (is_ai_related, score_relevance) |
-| Task 5 | ✅ 完成 | `bd18db8` | 数据库存储模块 (SQLite, 趋势分析, 本地搜索) |
-
-### 待完成 (5/10)
+### 已完成 (10/10) ✅
 
 | 任务 | 状态 | 描述 |
 |------|------|------|
-| Task 6 | ⏳ 待执行 | GitHub API客户端 (异步API调用, 限流器) |
-| Task 7 | ⏳ 待执行 | CLI入口实现 (scrape, list, trending, config, db命令) |
-| Task 8 | ⏳ 待执行 | Go调度器实现 (并发调度, 令牌桶限流, 批量处理) |
-| Task 9 | ⏳ 待执行 | 集成测试 |
-| Task 10 | ⏳ 待执行 | 文档和最终整理 |
+| Task 1 | ✅ 完成 | 项目初始化 (pyproject.toml, go.mod, 目录结构) |
+| Task 2 | ✅ 完成 | 数据模型定义 (Repository, RepoSnapshot, FilterConfig, ScrapeConfig) |
+| Task 3 | ✅ 完成 | 配置管理模块 (YAML配置, 环境变量替换) |
+| Task 4 | ✅ 完成 | AI过滤器实现 (is_ai_related, score_relevance) |
+| Task 5 | ✅ 完成 | 数据库存储模块 (SQLite, 趋势分析, 本地搜索) |
+| Task 6 | ✅ 完成 | GitHub API客户端 (异步API调用, 限流器) |
+| Task 7 | ✅ 完成 | CLI入口实现 (scrape, list, trending, config, db命令) |
+| Task 8 | ✅ 完成 | Go调度器实现 (并发调度, 令牌桶限流, 批量处理) |
+| Task 9 | ✅ 完成 | 集成测试 |
+| Task 10 | ✅ 完成 | 文档和最终整理 |
 
-## 已创建文件
+## 项目结构
 
 ```
 github-ai-scraper/
 ├── pyproject.toml          ✅ Python项目配置
 ├── go.mod                  ✅ Go模块配置
 ├── ai-scraper.yaml         ✅ 默认配置文件
+├── README.md               ✅ 项目文档
 ├── src/ai_scraper/
 │   ├── __init__.py         ✅ 包初始化
+│   ├── cli.py              ✅ CLI入口
 │   ├── config.py           ✅ 配置管理
 │   ├── models/
 │   │   ├── __init__.py     ✅
@@ -45,48 +42,60 @@ github-ai-scraper/
 │   ├── filters/
 │   │   ├── __init__.py     ✅
 │   │   └── ai_filter.py    ✅ AI过滤器
-│   └── storage/
+│   ├── storage/
+│   │   ├── __init__.py     ✅
+│   │   └── database.py     ✅ SQLite存储
+│   └── api/
 │       ├── __init__.py     ✅
-│       └── database.py     ✅ SQLite存储
+│       ├── github.py       ✅ GitHub API客户端
+│       └── rate_limiter.py ✅ 令牌桶限流器
+├── cmd/scheduler/          ✅ Go调度器
+│   ├── main.go
+│   ├── scheduler.go
+│   ├── limiter.go
+│   └── processor.go
 ├── tests/
 │   ├── __init__.py         ✅
 │   ├── test_models.py      ✅ 5 tests
 │   ├── test_config.py      ✅ 3 tests
 │   ├── test_filter.py      ✅ 5 tests
-│   └── test_database.py    ✅ 6 tests
+│   ├── test_database.py    ✅ 6 tests
+│   ├── test_github.py      ✅ 6 tests
+│   ├── test_cli.py         ✅ 6 tests
+│   └── test_integration.py ✅ 5 tests
 └── data/
     └── .gitkeep            ✅ 数据目录
 ```
 
 ## 测试状态
 
-- **当前通过:** 19 tests
+- **当前通过:** 36 tests
 - **测试命令:** `python -m pytest tests/ -v`
 
-## Git提交历史
+## 使用方法
 
+```bash
+# 安装
+pip install -e .
+
+# 设置GitHub Token (可选，提高API限制)
+export GITHUB_TOKEN=your_token_here
+
+# 爬取AI仓库
+ai-scraper scrape
+
+# 列出仓库
+ai-scraper list
+
+# 查看趋势
+ai-scraper trending
+
+# 导出数据
+ai-scraper db export --format csv --output repos.csv
 ```
-bd18db8 feat: add SQLite database storage module
-4a79d60 feat: add AI filter for repository classification
-e829e10 feat: add configuration management with YAML support
-14f8d39 feat: add data models for repository, snapshot, and config
-59d2e1b fix: update Go module path for cmd/scheduler
-2d3adf9 chore: initialize project structure
-```
 
-## 下一步操作
+## 注意事项
 
-继续执行 Task 6: GitHub API客户端
-
-**实现内容:**
-- `src/ai_scraper/api/__init__.py`
-- `src/ai_scraper/api/rate_limiter.py` - 令牌桶限流器
-- `src/ai_scraper/api/github.py` - 异步GitHub API客户端
-- `tests/test_github.py` - API客户端测试
-
-## 如何继续开发
-
-1. 进入项目目录: `cd C:\Users\admin\Projects\tools\github-ai-scraper`
-2. 查看此进度文件: `docs/PROGRESS.md`
-3. 继续执行剩余任务 (Task 6-10)
-4. 实现计划详见: `docs/superpowers/plans/2026-05-09-github-ai-scraper.md`
+- Go调度器需要安装Go 1.21+才能编译
+- 无GitHub Token时API限制为60请求/小时
+- 有Token时API限制为5000请求/小时
