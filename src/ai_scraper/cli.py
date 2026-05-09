@@ -1,12 +1,15 @@
 """CLI entry point for ai-scraper."""
 
 import asyncio
+import re
+import sys
 from pathlib import Path
 from typing import Optional
 
 import click
 import rich.table as table
 from rich import print as rprint
+from rich.console import Console
 
 from ai_scraper import __version__
 from ai_scraper.api.github import GitHubClient
@@ -14,6 +17,28 @@ from ai_scraper.config import Config, load_config
 from ai_scraper.filters.ai_filter import AIFilter
 from ai_scraper.models.repository import FilterConfig as FilterConfigModel
 from ai_scraper.storage.database import Database
+
+# Create console with UTF-8 encoding for Windows
+console = Console(force_terminal=True)
+
+
+def clean_text(text: str) -> str:
+    """Remove emoji and special characters that can't be displayed in Windows terminal."""
+    if not text:
+        return ""
+    # Remove emoji, zero-width joiners, and other non-printable characters
+    # Keep only ASCII and common Unicode letters/numbers/punctuation
+    result = []
+    for char in text:
+        # Keep ASCII printable characters and common Unicode ranges
+        if (32 <= ord(char) <= 126 or  # ASCII printable
+            '\u4e00' <= char <= '\u9fff' or  # Chinese characters
+            '\u0400' <= char <= '\u04ff' or  # Cyrillic
+            char in ' \t'):  # Basic whitespace
+            result.append(char)
+        elif char in '\n\r':
+            result.append(' ')
+    return ''.join(result)
 
 
 @click.group()
@@ -43,7 +68,7 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
     if max_results is not None:
         config.scrape.max_results = max_results
 
-    rprint("[bold blue]Starting scrape...[/bold blue]")
+    console.print("[bold blue]Starting scrape...[/bold blue]")
 
     async def run_scrape():
         client = GitHubClient(token=config.github.token)
@@ -56,7 +81,7 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
             topics_query = " ".join(f"topic:{t}" for t in config.filter.topics[:5])
             query = f"stars:>{config.filter.min_stars} {topics_query}"
 
-            rprint(f"[dim]Query: {query}[/dim]")
+            console.print(f"[dim]Query: {query}[/dim]")
 
             # Search repositories
             all_repos = []
@@ -90,13 +115,13 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                         db.save_repository(repo, relevance_score=score)
                         all_repos.append(repo)
 
-                rprint(f"[dim]Page {page}: found {len(repos)} repos, {len(all_repos)} total AI-related[/dim]")
+                console.print(f"[dim]Page {page}: found {len(repos)} repos, {len(all_repos)} total AI-related[/dim]")
                 page += 1
 
                 if len(repos) < per_page:
                     break
 
-            rprint(f"[bold green]Scraped {len(all_repos)} AI repositories[/bold green]")
+            console.print(f"[bold green]Scraped {len(all_repos)} AI repositories[/bold green]")
 
         finally:
             await client.close()
@@ -116,7 +141,7 @@ def list_repos(ctx: click.Context, sort: str, lang: Optional[str], limit: int):
     db = Database(Path(config.database.path))
 
     if not Path(config.database.path).exists():
-        rprint("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
+        console.print("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
         return
 
     db.init_db()
@@ -135,10 +160,11 @@ def list_repos(ctx: click.Context, sort: str, lang: Optional[str], limit: int):
 
     for repo in repos:
         stars_str = f"{repo.stars:,}"
-        desc = repo.description[:37] + "..." if repo.description and len(repo.description) > 40 else repo.description or ""
+        desc = clean_text(repo.description)
+        desc = desc[:37] + "..." if desc and len(desc) > 40 else desc or ""
         tbl.add_row(repo.name, stars_str, repo.language or "-", desc)
 
-    rprint(tbl)
+    console.print(tbl)
     db.close()
 
 
@@ -152,15 +178,15 @@ def trending(ctx: click.Context, days: int, top: int):
     db = Database(Path(config.database.path))
 
     if not Path(config.database.path).exists():
-        rprint("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
+        console.print("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
         return
 
     db.init_db()
     trends = db.get_trending(days=days, limit=top)
 
     if not trends:
-        rprint(f"[yellow]No trending data found for the last {days} days.[/yellow]")
-        rprint("[dim]Run 'ai-scraper scrape' multiple times to build trend data.[/dim]")
+        console.print(f"[yellow]No trending data found for the last {days} days.[/yellow]")
+        console.print("[dim]Run 'ai-scraper scrape' multiple times to build trend data.[/dim]")
         db.close()
         return
 
@@ -174,7 +200,7 @@ def trending(ctx: click.Context, days: int, top: int):
         stars_str = f"{trend.current_stars:,}"
         tbl.add_row(trend.repo_name, growth_str, stars_str)
 
-    rprint(tbl)
+    console.print(tbl)
     db.close()
 
 
@@ -191,7 +217,7 @@ def config_init(ctx: click.Context):
     config_path: Path = ctx.obj["config_path"]
 
     if config_path.exists():
-        rprint(f"[yellow]Config file already exists at {config_path}[/yellow]")
+        console.print(f"[yellow]Config file already exists at {config_path}[/yellow]")
         return
 
     # Copy default config
@@ -200,9 +226,9 @@ def config_init(ctx: click.Context):
 
     if default_config.exists():
         shutil.copy(default_config, config_path)
-        rprint(f"[green]Created config file at {config_path}[/green]")
+        console.print(f"[green]Created config file at {config_path}[/green]")
     else:
-        rprint("[red]Default config not found[/red]")
+        console.print("[red]Default config not found[/red]")
 
 
 @config_cmd.command("show")
@@ -211,15 +237,15 @@ def config_show(ctx: click.Context):
     """Show current configuration."""
     config: Config = ctx.obj["config"]
 
-    rprint("[bold]Current Configuration:[/bold]")
-    rprint(f"  GitHub Token: {'***' if config.github.token else 'Not set'}")
-    rprint(f"  Cache TTL: {config.github.cache_ttl}s")
-    rprint(f"  Min Stars: {config.filter.min_stars}")
-    rprint(f"  Keywords: {', '.join(config.filter.keywords[:5])}...")
-    rprint(f"  Topics: {', '.join(config.filter.topics[:5])}...")
-    rprint(f"  Max Results: {config.scrape.max_results}")
-    rprint(f"  Database: {config.database.path}")
-    rprint(f"  Scheduler: {'enabled' if config.scheduler.enabled else 'disabled'}")
+    console.print("[bold]Current Configuration:[/bold]")
+    console.print(f"  GitHub Token: {'***' if config.github.token else 'Not set'}")
+    console.print(f"  Cache TTL: {config.github.cache_ttl}s")
+    console.print(f"  Min Stars: {config.filter.min_stars}")
+    console.print(f"  Keywords: {', '.join(config.filter.keywords[:5])}...")
+    console.print(f"  Topics: {', '.join(config.filter.topics[:5])}...")
+    console.print(f"  Max Results: {config.scrape.max_results}")
+    console.print(f"  Database: {config.database.path}")
+    console.print(f"  Scheduler: {'enabled' if config.scheduler.enabled else 'disabled'}")
 
 
 cli.add_command(config_cmd, name="config")
@@ -239,16 +265,16 @@ def db_stats(ctx: click.Context):
     db = Database(Path(config.database.path))
 
     if not Path(config.database.path).exists():
-        rprint("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
+        console.print("[yellow]No database found. Run 'ai-scraper scrape' first.[/yellow]")
         return
 
     db.init_db()
     stats = db.get_stats()
 
-    rprint("[bold]Database Statistics:[/bold]")
-    rprint(f"  Repository count: {stats['repository_count']}")
-    rprint(f"  Snapshot count: {stats['snapshot_count']}")
-    rprint(f"  Total stars: {stats['total_stars']:,}")
+    console.print("[bold]Database Statistics:[/bold]")
+    console.print(f"  Repository count: {stats['repository_count']}")
+    console.print(f"  Snapshot count: {stats['snapshot_count']}")
+    console.print(f"  Total stars: {stats['total_stars']:,}")
 
     db.close()
 
@@ -262,13 +288,13 @@ def db_clean(ctx: click.Context, days: int):
     db = Database(Path(config.database.path))
 
     if not Path(config.database.path).exists():
-        rprint("[yellow]No database found.[/yellow]")
+        console.print("[yellow]No database found.[/yellow]")
         return
 
     db.init_db()
     deleted = db.clean_old_snapshots(days=days)
 
-    rprint(f"[green]Deleted {deleted} old snapshots[/green]")
+    console.print(f"[green]Deleted {deleted} old snapshots[/green]")
     db.close()
 
 
@@ -282,7 +308,7 @@ def db_export(ctx: click.Context, format: str, output: str):
     db = Database(Path(config.database.path))
 
     if not Path(config.database.path).exists():
-        rprint("[yellow]No database found.[/yellow]")
+        console.print("[yellow]No database found.[/yellow]")
         return
 
     db.init_db()
@@ -304,7 +330,7 @@ def db_export(ctx: click.Context, format: str, output: str):
                     repo.url,
                 ])
 
-        rprint(f"[green]Exported {len(repos)} repositories to {output}[/green]")
+        console.print(f"[green]Exported {len(repos)} repositories to {output}[/green]")
 
     elif format == "json":
         import json
@@ -326,7 +352,7 @@ def db_export(ctx: click.Context, format: str, output: str):
         with open(output, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        rprint(f"[green]Exported {len(repos)} repositories to {output}[/green]")
+        console.print(f"[green]Exported {len(repos)} repositories to {output}[/green]")
 
     db.close()
 
