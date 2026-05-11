@@ -16,6 +16,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskPr
 
 from ai_scraper import __version__
 from ai_scraper.api.github import GitHubClient
+from ai_scraper.api.gitlab import GitLabClient
 from ai_scraper.config import Config, load_config
 from ai_scraper.filters.ai_filter import AIFilter
 from ai_scraper.keywords.extractor import KeywordExtractor
@@ -113,10 +114,12 @@ def cli(ctx: click.Context, config: Optional[str]):
 @click.option("--incremental", is_flag=True, help="Only fetch repos updated since last scrape")
 @click.option("--since", type=str, help="Fetch repos updated since date (YYYY-MM-DD or 1d/1w/1m)")
 @click.option("--progress/--no-progress", default=True, help="Show progress bar (default: on)")
+@click.option("--platform", type=click.Choice(["github", "gitlab"]), default="github", help="Platform to scrape (github or gitlab)")
+@click.option("--gitlab-url", type=str, help="GitLab instance URL (for self-hosted GitLab)")
 @click.pass_context
 def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[int],
-           incremental: bool, since: Optional[str], progress: bool):
-    """Scrape AI repositories from GitHub."""
+           incremental: bool, since: Optional[str], progress: bool, platform: str, gitlab_url: Optional[str]):
+    """Scrape AI repositories from GitHub or GitLab."""
     config: Config = ctx.obj["config"]
 
     # Override config with CLI options
@@ -135,10 +138,18 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
             console.print(f"[red]Error: {e}[/red]")
             sys.exit(1)
 
-    console.print("[bold blue]Starting scrape...[/bold blue]")
+    console.print(f"[bold blue]Starting scrape from {platform}...[/bold blue]")
 
     async def run_scrape(since_date_inner: Optional[datetime]):
-        client = GitHubClient(token=config.github.token)
+        # Create appropriate client based on platform
+        if platform == "gitlab":
+            client = GitLabClient(
+                token=config.gitlab.token or config.github.token,
+                base_url=gitlab_url or config.gitlab.base_url
+            )
+        else:
+            client = GitHubClient(token=config.github.token)
+
         db = Database(Path(config.database.path))
         db.init_db()
         filter_instance = AIFilter()
@@ -163,19 +174,20 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                     if not progress:
                         console.print("[dim]Incremental mode: no previous scrape found, fetching all repos[/dim]")
 
-            # Build search query - use single topic for broader results
-            # GitHub search API has issues with OR queries, use primary topic
+            # Build search query based on platform
             primary_topic = config.filter.topics[0] if config.filter.topics else "ai"
-            query = f"stars:>{config.filter.min_stars} topic:{primary_topic}"
 
-            # Add date filter if incremental
-            if since_date_inner:
-                # GitHub API expects YYYY-MM-DD format
-                date_str = since_date_inner.strftime('%Y-%m-%d')
-                query += f" pushed:>{date_str}"
+            if platform == "gitlab":
+                # GitLab uses different search syntax
+                query = "ai"  # GitLab search is simpler
                 if not progress:
-                    console.print(f"[dim]Query: {query} (incremental)[/dim]")
+                    console.print(f"[dim]Searching GitLab for: {query}[/dim]")
             else:
+                # GitHub search
+                query = f"stars:>{config.filter.min_stars} topic:{primary_topic}"
+                if since_date_inner:
+                    date_str = since_date_inner.strftime('%Y-%m-%d')
+                    query += f" pushed:>{date_str}"
                 if not progress:
                     console.print(f"[dim]Query: {query}[/dim]")
 
@@ -195,18 +207,29 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                     console=console,
                 ) as progress_bar:
                     task = progress_bar.add_task(
-                        "[cyan]Scraping AI repositories...",
+                        f"[cyan]Scraping {platform} repositories...",
                         total=max_results
                     )
 
                     while len(all_repos) < max_results:
-                        repos = await client.search_repositories(
-                            query=query,
-                            sort="stars",
-                            order="desc",
-                            page=page,
-                            per_page=per_page,
-                        )
+                        # Use appropriate search method based on platform
+                        if platform == "gitlab":
+                            repos = await client.search_projects(
+                                query=query,
+                                sort="star_count",
+                                order="desc",
+                                page=page,
+                                per_page=per_page,
+                                min_stars=config.filter.min_stars,
+                            )
+                        else:
+                            repos = await client.search_repositories(
+                                query=query,
+                                sort="stars",
+                                order="desc",
+                                page=page,
+                                per_page=per_page,
+                            )
 
                         if not repos:
                             break
@@ -237,13 +260,23 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
             else:
                 # No progress bar - use original console output
                 while len(all_repos) < max_results:
-                    repos = await client.search_repositories(
-                        query=query,
-                        sort="stars",
-                        order="desc",
-                        page=page,
-                        per_page=per_page,
-                    )
+                    if platform == "gitlab":
+                        repos = await client.search_projects(
+                            query=query,
+                            sort="star_count",
+                            order="desc",
+                            page=page,
+                            per_page=per_page,
+                            min_stars=config.filter.min_stars,
+                        )
+                    else:
+                        repos = await client.search_repositories(
+                            query=query,
+                            sort="stars",
+                            order="desc",
+                            page=page,
+                            per_page=per_page,
+                        )
 
                     if not repos:
                         break
@@ -399,6 +432,8 @@ def config_show(ctx: click.Context):
 
     console.print("[bold]Current Configuration:[/bold]")
     console.print(f"  GitHub Token: {'***' if config.github.token else 'Not set'}")
+    console.print(f"  GitLab Token: {'***' if config.gitlab.token else 'Not set'}")
+    console.print(f"  GitLab URL: {config.gitlab.base_url}")
     console.print(f"  Cache TTL: {config.github.cache_ttl}s")
     console.print(f"  Min Stars: {config.filter.min_stars}")
     console.print(f"  Keywords: {', '.join(config.filter.keywords[:5])}...")

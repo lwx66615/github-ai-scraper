@@ -18,6 +18,15 @@ class GitHubConfig:
 
 
 @dataclass
+class GitLabConfig:
+    """GitLab API configuration."""
+
+    token: Optional[str] = None
+    base_url: str = "https://gitlab.com/api/v4"
+    cache_ttl: int = 3600
+
+
+@dataclass
 class FilterConfigYaml:
     """Filter configuration from YAML."""
 
@@ -100,6 +109,7 @@ class Config:
     """Main configuration."""
 
     github: GitHubConfig = field(default_factory=GitHubConfig)
+    gitlab: GitLabConfig = field(default_factory=GitLabConfig)
     filter: FilterConfigYaml = field(default_factory=FilterConfigYaml)
     scrape: ScrapeConfigYaml = field(default_factory=ScrapeConfigYaml)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
@@ -151,6 +161,13 @@ def load_config(config_path: Optional[Path] = None) -> Config:
     github = GitHubConfig(
         token=processed_config.get("github", {}).get("token"),
         cache_ttl=processed_config.get("github", {}).get("cache_ttl", 3600),
+    )
+
+    gitlab_dict = processed_config.get("gitlab", {})
+    gitlab_config = GitLabConfig(
+        token=gitlab_dict.get("token"),
+        base_url=gitlab_dict.get("base_url", "https://gitlab.com/api/v4"),
+        cache_ttl=gitlab_dict.get("cache_ttl", 3600),
     )
 
     filter_dict = processed_config.get("filter", {})
@@ -209,6 +226,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
 
     return Config(
         github=github,
+        gitlab=gitlab_config,
         filter=filter_config,
         scrape=scrape_config,
         database=database_config,

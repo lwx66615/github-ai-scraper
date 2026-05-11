@@ -1,14 +1,15 @@
-# GitHub AI Scraper
+# GitHub/GitLab AI Scraper
 
 English | [简体中文](README_CN.md)
 
-A CLI tool for scraping AI-related high-star repositories from GitHub.
+A CLI tool for scraping AI-related high-star repositories from GitHub and GitLab.
 
 ## Features
 
+- **Multi-platform support** - Scrape from GitHub or GitLab (including self-hosted instances)
 - Search and filter AI-related repositories by keywords and topics
 - **Dynamic keyword extraction** - Automatically learns new keywords from scraped repos
-- **Markdown/HTML/Excel/RSS report generation** - Multiple export formats
+- **Markdown/HTML/Excel/RSS report generation** - Multiple export formats with Chinese translation
 - **Incremental scraping** - Fetch only updated repos with `--since` flag
 - **Resume support** - Continue interrupted scrapes with progress tracking
 - **Progress bar display** - Visual progress during scraping
@@ -17,8 +18,8 @@ A CLI tool for scraping AI-related high-star repositories from GitHub.
 - **Multi-language search** - Support for Chinese and English keywords
 - Local SQLite storage with trend analysis
 - Configurable filtering and scraping options
-- Rate limiting with GitHub API token support
-- Export to CSV/JSON/HTML/Excel/RSS formats
+- Rate limiting with GitHub/GitLab API token support
+- Export to CSV/JSON/HTML/Excel/RSS/Markdown formats
 - **REST API server** - Access data via HTTP endpoints with optional authentication
 - **Scheduled scraping** - Cron-based periodic scraping
 - **Webhook notifications** - Notify external services on events
@@ -42,8 +43,14 @@ pip install -e .
 # Set your GitHub token (optional, increases rate limit)
 export GITHUB_TOKEN=your_token_here
 
-# Scrape AI repositories
+# Scrape AI repositories from GitHub (default)
 ai-scraper scrape
+
+# Scrape from GitLab
+ai-scraper scrape --platform gitlab
+
+# Scrape from self-hosted GitLab
+ai-scraper scrape --platform gitlab --gitlab-url https://your-gitlab.com/api/v4
 
 # Scrape with progress bar
 ai-scraper scrape --progress
@@ -71,6 +78,7 @@ ai-scraper trending
 ai-scraper db export --format html --output index.html
 ai-scraper db export --format xlsx --output repos.xlsx
 ai-scraper db export --format rss --output feed.xml
+ai-scraper db export --format markdown --output repositories.md
 
 # Start REST API server (with authentication)
 ai-scraper serve --port 8080 --auth
@@ -90,6 +98,11 @@ Create `ai-scraper.yaml` to customize:
 ```yaml
 github:
   token: ${GITHUB_TOKEN}
+  cache_ttl: 3600
+
+gitlab:
+  token: ${GITLAB_TOKEN}  # Optional, for GitLab scraping
+  base_url: https://gitlab.com/api/v4  # Or your self-hosted GitLab URL
   cache_ttl: 3600
 
 filter:
@@ -129,6 +142,8 @@ webhooks:
 | Command | Description |
 |---------|-------------|
 | `ai-scraper scrape` | Scrape AI repositories from GitHub |
+| `ai-scraper scrape --platform gitlab` | Scrape from GitLab |
+| `ai-scraper scrape --platform gitlab --gitlab-url URL` | Scrape from self-hosted GitLab |
 | `ai-scraper scrape --concurrent` | Concurrent scraping for faster results |
 | `ai-scraper scrape --incremental` | Incremental scraping (only updated repos) |
 | `ai-scraper scrape --since 7d` | Fetch repos updated in last 7 days |
