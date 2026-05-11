@@ -317,6 +317,68 @@ class Database:
             contributors=row["contributors"],
         )
 
+    def get_last_scrape_time(self) -> Optional[datetime]:
+        """Get the timestamp of the most recent repository update.
+
+        Returns:
+            MAX(last_updated_at) from repositories, or None if empty.
+        """
+        cursor = self.conn.cursor()
+
+        cursor.execute("SELECT MAX(last_updated_at) as max_time FROM repositories")
+        row = cursor.fetchone()
+
+        if row["max_time"] is None:
+            return None
+
+        return datetime.fromisoformat(row["max_time"])
+
+    def get_repos_updated_since(self, since: datetime) -> list[Repository]:
+        """Get repositories updated on or after the given time.
+
+        Args:
+            since: Cutoff datetime.
+
+        Returns:
+            List of repositories where last_updated_at >= since.
+        """
+        cursor = self.conn.cursor()
+
+        cursor.execute("""
+            SELECT * FROM repositories
+            WHERE last_updated_at >= ?
+            ORDER BY last_updated_at DESC
+        """, (since.isoformat(),))
+
+        rows = cursor.fetchall()
+        return [self._row_to_repo(row) for row in rows]
+
+    def needs_update(self, repo_id: int, max_age_days: int = 7) -> bool:
+        """Check if a repository needs to be updated.
+
+        Args:
+            repo_id: Repository ID to check.
+            max_age_days: Maximum age in days before needing update.
+
+        Returns:
+            True if repo doesn't exist or is older than max_age_days.
+        """
+        cursor = self.conn.cursor()
+
+        cursor.execute("""
+            SELECT last_updated_at FROM repositories WHERE id = ?
+        """, (repo_id,))
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return True
+
+        last_updated = datetime.fromisoformat(row["last_updated_at"])
+        age = datetime.now() - last_updated
+
+        return age.days > max_age_days
+
     def close(self) -> None:
         """Close database connection."""
         if self.conn:

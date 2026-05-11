@@ -3,6 +3,7 @@
 import asyncio
 import re
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +44,46 @@ def clean_text(text: str) -> str:
     return ''.join(result)
 
 
+def parse_since_param(since: Optional[str]) -> Optional[datetime]:
+    """Parse the --since parameter into a datetime.
+
+    Args:
+        since: Either YYYY-MM-DD format or relative like '1d', '1w', '1m'.
+
+    Returns:
+        datetime representing the cutoff time, or None if since is None.
+
+    Raises:
+        ValueError: If the format is invalid.
+    """
+    if since is None:
+        return None
+
+    # Try YYYY-MM-DD format first
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', since):
+        return datetime.strptime(since, '%Y-%m-%d')
+
+    # Try relative format: number + unit (d, w, m)
+    match = re.match(r'^(\d+)([dwmy])$', since.lower())
+    if match:
+        amount = int(match.group(1))
+        unit = match.group(2)
+
+        if unit == 'd':
+            return datetime.now() - timedelta(days=amount)
+        elif unit == 'w':
+            return datetime.now() - timedelta(weeks=amount)
+        elif unit == 'm':
+            return datetime.now() - timedelta(days=amount * 30)
+        elif unit == 'y':
+            return datetime.now() - timedelta(days=amount * 365)
+
+    raise ValueError(
+        f"Invalid --since format: '{since}'. "
+        "Use YYYY-MM-DD or relative format like '1d', '1w', '1m', '1y'."
+    )
+
+
 @click.group()
 @click.version_option(version=__version__)
 @click.option("--config", "-c", type=click.Path(exists=True), help="Config file path")
@@ -59,8 +100,11 @@ def cli(ctx: click.Context, config: Optional[str]):
 @cli.command()
 @click.option("--min-stars", type=int, help="Minimum stars filter")
 @click.option("--max-results", type=int, help="Maximum results to fetch")
+@click.option("--incremental", is_flag=True, help="Only fetch repos updated since last scrape")
+@click.option("--since", type=str, help="Fetch repos updated since date (YYYY-MM-DD or 1d/1w/1m)")
 @click.pass_context
-def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[int]):
+def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[int],
+           incremental: bool, since: Optional[str]):
     """Scrape AI repositories from GitHub."""
     config: Config = ctx.obj["config"]
 
@@ -69,6 +113,16 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
         config.filter.min_stars = min_stars
     if max_results is not None:
         config.scrape.max_results = max_results
+
+    # Parse --since parameter
+    since_date: Optional[datetime] = None
+    if since:
+        try:
+            since_date = parse_since_param(since)
+            console.print(f"[dim]Fetching repos updated since: {since_date}[/dim]")
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            sys.exit(1)
 
     console.print("[bold blue]Starting scrape...[/bold blue]")
 
@@ -87,11 +141,27 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
         )
 
         try:
+            # Handle incremental mode
+            if incremental and since_date is None:
+                last_scrape = db.get_last_scrape_time()
+                if last_scrape:
+                    since_date = last_scrape
+                    console.print(f"[dim]Incremental mode: fetching repos since last scrape ({last_scrape})[/dim]")
+                else:
+                    console.print("[dim]Incremental mode: no previous scrape found, fetching all repos[/dim]")
+
             # Build search query
             topics_query = " ".join(f"topic:{t}" for t in config.filter.topics[:5])
             query = f"stars:>{config.filter.min_stars} {topics_query}"
 
-            console.print(f"[dim]Query: {query}[/dim]")
+            # Add date filter if incremental
+            if since_date:
+                # GitHub API expects YYYY-MM-DD format
+                date_str = since_date.strftime('%Y-%m-%d')
+                query += f" pushed:>{date_str}"
+                console.print(f"[dim]Query: {query} (incremental)[/dim]")
+            else:
+                console.print(f"[dim]Query: {query}[/dim]")
 
             # Search repositories
             all_repos = []
