@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class Repository(BaseModel):
-    """GitHub repository information."""
+    """Repository information (GitHub or GitLab)."""
 
-    id: int = Field(gt=0, description="GitHub repository ID")
+    id: int = Field(gt=0, description="Repository ID")
     name: str = Field(min_length=1, max_length=200)
     full_name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=1000)
@@ -19,7 +19,7 @@ class Repository(BaseModel):
     created_at: datetime
     updated_at: datetime
     pushed_at: datetime
-    url: str = Field(pattern=r"^https://github\.com/")
+    url: str = Field(pattern=r"^https?://[\w\.-]+/[\w\-\.]+/[\w\-\.]+")
     open_issues: Optional[int] = Field(None, ge=0)
     forks: Optional[int] = Field(None, ge=0)
     contributors: Optional[int] = Field(None, ge=0)
