@@ -46,6 +46,18 @@ CATEGORIES = {
         "keywords": ["langchain", "llamaindex", "autogpt", "agent", "ai tool", "ai framework"],
         "topics": ["langchain", "llamaindex", "autogpt", "ai-agent"],
     },
+    "mlops": {
+        "keywords": ["mlops", "ml pipeline", "model deployment", "model serving", "mlflow", "kubeflow", "model registry"],
+        "topics": ["mlops", "ml-pipeline", "model-deployment", "mlflow", "kubeflow"],
+    },
+    "ai-infrastructure": {
+        "keywords": ["gpu", "cuda", "inference", "optimization", "quantization", "tensorrt", "onnx runtime"],
+        "topics": ["gpu-computing", "inference", "model-optimization", "quantization"],
+    },
+    "ai-ethics": {
+        "keywords": ["ai ethics", "bias detection", "fairness", "explainability", "interpretability", "responsible ai"],
+        "topics": ["ai-ethics", "fairness", "explainability", "responsible-ai"],
+    },
 }
 
 TECH_STACK = {
