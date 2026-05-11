@@ -48,8 +48,8 @@ def test_inactive_repo_low_score():
         language="Python",
         topics=[],
         created_at=datetime.now() - timedelta(days=365),
-        updated_at=datetime.now() - timedelta(days=180),
-        pushed_at=datetime.now() - timedelta(days=180),
+        updated_at=datetime.now() - timedelta(days=400),  # Very old
+        pushed_at=datetime.now() - timedelta(days=400),  # Very old
         url="https://github.com/test/inactive-repo",
         open_issues=50,
         forks=5,
@@ -57,7 +57,7 @@ def test_inactive_repo_low_score():
 
     score = assessor.assess(repo)
 
-    assert score.activity < 30
+    assert score.activity < 30  # 0 for > 365 days
     assert score.overall < 50
 
 

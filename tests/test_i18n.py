@@ -15,7 +15,7 @@ def test_load_translations():
 
 def test_get_translated_keywords():
     """Test getting keywords for multiple languages."""
-    keywords = get_translated_keywords(["ai", "machine-learning"], languages=["en", "zh"])
+    keywords = get_translated_keywords(["ai", "machine learning"], languages=["en", "zh"])
 
     assert "ai" in keywords
     assert "人工智能" in keywords

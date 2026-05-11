@@ -1,0 +1,54 @@
+{
+  "repositories": [
+    {
+      "name": "explosion/spaCy",
+      "stars": 33557,
+      "language": "Python",
+      "description": "\ud83d\udcab Industrial-strength Natural Language Processing (NLP) in Python",
+      "url": "https://github.com/explosion/spaCy"
+    },
+    {
+      "name": "olivia-ai/olivia",
+      "stars": 3719,
+      "language": "Go",
+      "description": "\ud83d\udc81\u200d\u2640\ufe0fYour new best friend powered by an artificial neural network",
+      "url": "https://github.com/olivia-ai/olivia"
+    },
+    {
+      "name": "Mohitkr95/best-data-science-resources",
+      "stars": 524,
+      "language": "Jupyter Notebook",
+      "description": "This repository contains the best Data Science free hand-picked resources to equip you with all the industry-driven skills and interview preparation kit.",
+      "url": "https://github.com/Mohitkr95/best-data-science-resources"
+    },
+    {
+      "name": "williamcwi/DeepLearning.AI-TensorFlow-Developer-Professional-Certificate",
+      "stars": 215,
+      "language": "Jupyter Notebook",
+      "description": "DeepLearning.AI TensorFlow Developer Professional Certificate",
+      "url": "https://github.com/williamcwi/DeepLearning.AI-TensorFlow-Developer-Professional-Certificate"
+    },
+    {
+      "name": "csinva/imodelsX",
+      "stars": 175,
+      "language": "Python",
+      "description": "Interpret text data with LLMs (sklearn compatible).",
+      "url": "https://github.com/csinva/imodelsX"
+    },
+    {
+      "name": "csinva/gpt-paper-title-generator",
+      "stars": 149,
+      "language": "Jupyter Notebook",
+      "description": "Generating paper titles (and more!) with GPT trained on data scraped from arXiv.",
+      "url": "https://github.com/csinva/gpt-paper-title-generator"
+    },
+    {
+      "name": "aymara/lima",
+      "stars": 119,
+      "language": "C++",
+      "description": "The Libre Multilingual Analyzer, a Natural Language Processing (NLP) C++ toolkit.",
+      "url": "https://github.com/aymara/lima"
+    }
+  ],
+  "total": 7
+}

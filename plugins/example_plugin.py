@@ -1,6 +1,6 @@
 """Example plugin demonstrating the plugin system."""
 
-from ai_scraper.plugins import BasePlugin, PluginInfo
+from ai_scraper.plugin_system import BasePlugin, PluginInfo
 from ai_scraper.models.repository import Repository
 
 

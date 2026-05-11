@@ -1,3 +1,5 @@
 """Built-in plugins for ai-scraper."""
 
-# Example plugin structure (can be expanded)
+from ai_scraper.plugin_system import BasePlugin, PluginInfo, PluginManager
+
+__all__ = ["BasePlugin", "PluginInfo", "PluginManager"]

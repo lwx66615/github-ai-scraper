@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 from datetime import datetime
-from ai_scraper.plugins import PluginManager
+from ai_scraper.plugin_system import PluginManager
 from ai_scraper.models.repository import Repository
 
 
