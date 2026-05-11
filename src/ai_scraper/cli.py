@@ -595,6 +595,32 @@ def serve(ctx: click.Context, host: str, port: int):
 
 
 @cli.command()
+@click.option("--cron", default="0 9 * * *", help="Cron expression for schedule")
+@click.option("--max-results", default=100, help="Max results per scrape")
+@click.pass_context
+def schedule(ctx: click.Context, cron: str, max_results: int):
+    """Schedule periodic scraping.
+
+    Example cron expressions:
+      "0 9 * * *"     - Daily at 9:00 AM
+      "0 */6 * * *"   - Every 6 hours
+      "0 9 * * 1-5"   - Weekdays at 9:00 AM
+    """
+    from ai_scraper.scheduler import scheduler
+
+    async def run_scrape():
+        console.print(f"[dim]{datetime.now()}: Starting scheduled scrape[/dim]")
+        ctx.invoke(scrape, max_results=max_results)
+
+    scheduler.add_task("scrape", cron, lambda: asyncio.run(run_scrape()))
+
+    console.print(f"[bold green]Scheduler started[/bold green]")
+    console.print(f"[dim]Next run: {scheduler.tasks['scrape']['next_run']}[/dim]")
+
+    asyncio.run(scheduler.run())
+
+
+@cli.command()
 @click.pass_context
 def interactive(ctx: click.Context):
     """Start interactive mode with menu-driven interface."""
