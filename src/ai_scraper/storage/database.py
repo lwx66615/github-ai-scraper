@@ -77,8 +77,12 @@ class Database:
 
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stars ON repositories(stars DESC)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_updated ON repositories(last_updated_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_updated ON repositories(last_updated_at DESC)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_repo_id ON snapshots(repo_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_language ON repositories(language)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON repositories(created_at DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_relevance ON repositories(relevance_score DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshot_at ON snapshots(snapshot_at DESC)")
 
         self.conn.commit()
 
@@ -378,6 +382,50 @@ class Database:
         age = datetime.now() - last_updated
 
         return age.days > max_age_days
+
+    def get_repos_by_language(self, language: str, limit: int = 50) -> list[Repository]:
+        """Get repositories by language (optimized with index).
+
+        Args:
+            language: Programming language.
+            limit: Maximum results.
+
+        Returns:
+            List of repositories.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT * FROM repositories
+            WHERE language = ?
+            ORDER BY stars DESC
+            LIMIT ?
+        """, (language, limit))
+
+        return [self._row_to_repo(row) for row in cursor.fetchall()]
+
+    def get_top_repos(self, limit: int = 100) -> list[Repository]:
+        """Get top repositories by stars (optimized).
+
+        Args:
+            limit: Maximum results.
+
+        Returns:
+            List of top repositories.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT * FROM repositories
+            ORDER BY stars DESC
+            LIMIT ?
+        """, (limit,))
+
+        return [self._row_to_repo(row) for row in cursor.fetchall()]
+
+    def vacuum(self) -> None:
+        """Optimize database by running VACUUM."""
+        cursor = self.conn.cursor()
+        cursor.execute("VACUUM")
+        self.conn.commit()
 
     def close(self) -> None:
         """Close database connection."""
