@@ -8,18 +8,27 @@ A CLI tool for scraping AI-related high-star repositories from GitHub.
 
 - Search and filter AI-related repositories by keywords and topics
 - **Dynamic keyword extraction** - Automatically learns new keywords from scraped repos
-- **Markdown/HTML report generation** - Generates readable reports
+- **Markdown/HTML/Excel/RSS report generation** - Multiple export formats
 - **Incremental scraping** - Fetch only updated repos with `--since` flag
+- **Resume support** - Continue interrupted scrapes with progress tracking
 - **Progress bar display** - Visual progress during scraping
 - **Interactive CLI mode** - Menu-driven interface for easy use
+- **Concurrent scraping** - Parallel requests for faster results
+- **Multi-language search** - Support for Chinese and English keywords
 - Local SQLite storage with trend analysis
 - Configurable filtering and scraping options
 - Rate limiting with GitHub API token support
-- Export to CSV/JSON/HTML formats
-- **REST API server** - Access data via HTTP endpoints
+- Export to CSV/JSON/HTML/Excel/RSS formats
+- **REST API server** - Access data via HTTP endpoints with optional authentication
 - **Scheduled scraping** - Cron-based periodic scraping
 - **Webhook notifications** - Notify external services on events
 - **Plugin system** - Extend functionality with custom plugins
+- **Repository health assessment** - Activity, popularity, maintenance scores
+- **Intelligent classification** - LLM, CV, NLP, MLOps, AI Infrastructure categories
+- **Deduplication** - Fork and mirror detection, content similarity
+- **Secure token storage** - Encrypted storage for sensitive tokens
+- **Database backup** - Automatic backup and restore functionality
+- **Error recovery** - Retry logic with exponential backoff
 
 ## Installation
 
@@ -39,9 +48,15 @@ ai-scraper scrape
 # Scrape with progress bar
 ai-scraper scrape --progress
 
+# Concurrent scraping (faster)
+ai-scraper scrape --concurrent
+
 # Incremental scraping (repos updated in last 7 days)
 ai-scraper scrape --incremental
 ai-scraper scrape --since 7d
+
+# Resume interrupted scrape
+ai-scraper scrape --resume
 
 # Interactive mode
 ai-scraper interactive
@@ -54,12 +69,18 @@ ai-scraper trending
 
 # Export data
 ai-scraper db export --format html --output index.html
+ai-scraper db export --format xlsx --output repos.xlsx
+ai-scraper db export --format rss --output feed.xml
 
-# Start REST API server
-ai-scraper serve --port 8080
+# Start REST API server (with authentication)
+ai-scraper serve --port 8080 --auth
 
 # Schedule periodic scraping (daily at 9am)
 ai-scraper schedule --cron "0 9 * * *"
+
+# Backup database
+ai-scraper db backup
+ai-scraper db restore backup_file.db.gz
 ```
 
 ## Configuration
@@ -76,6 +97,7 @@ filter:
   keywords:
     - ai
     - machine-learning
+    - 人工智能  # Chinese keyword support
   topics:
     - ai
     - deep-learning
@@ -83,9 +105,17 @@ filter:
 scrape:
   max_results: 500
   concurrency: 5
+  concurrent_requests: 5
 
 database:
   path: ./data/ai_scraper.db
+  backup_dir: ./backups
+  max_backups: 10
+
+api:
+  auth_enabled: true
+  api_keys:
+    - as_your_api_key_here
 
 webhooks:
   enabled: false
@@ -99,13 +129,16 @@ webhooks:
 | Command | Description |
 |---------|-------------|
 | `ai-scraper scrape` | Scrape AI repositories from GitHub |
+| `ai-scraper scrape --concurrent` | Concurrent scraping for faster results |
 | `ai-scraper scrape --incremental` | Incremental scraping (only updated repos) |
 | `ai-scraper scrape --since 7d` | Fetch repos updated in last 7 days |
+| `ai-scraper scrape --resume` | Resume interrupted scrape |
 | `ai-scraper scrape --progress` | Show progress bar during scraping |
 | `ai-scraper interactive` | Start interactive menu mode |
 | `ai-scraper list` | List scraped repositories |
 | `ai-scraper trending` | Show trending repositories by star growth |
 | `ai-scraper serve` | Start REST API server |
+| `ai-scraper serve --auth` | Start API server with authentication |
 | `ai-scraper schedule` | Schedule periodic scraping |
 | `ai-scraper keywords list` | List all keywords |
 | `ai-scraper keywords extract` | Extract keywords from database |
@@ -113,7 +146,10 @@ webhooks:
 | `ai-scraper config init` | Initialize config file |
 | `ai-scraper config show` | Show current config |
 | `ai-scraper db stats` | Show database statistics |
-| `ai-scraper db export` | Export data to CSV/JSON/HTML |
+| `ai-scraper db export` | Export data to CSV/JSON/HTML/Excel/RSS |
+| `ai-scraper db backup` | Create database backup |
+| `ai-scraper db restore` | Restore from backup |
+| `ai-scraper db backups` | List available backups |
 
 ## REST API Endpoints
 
@@ -127,6 +163,8 @@ When running `ai-scraper serve`:
 | `GET /api/trending` | Get trending repositories |
 | `GET /api/search?q=...` | Search repositories |
 
+Authentication: Pass `X-API-Key` header when `--auth` is enabled.
+
 ## Project Structure
 
 ```
@@ -137,11 +175,19 @@ github-ai-scraper/
 │   ├── interactive.py      # Interactive menu mode
 │   ├── classifier.py       # Repository classification
 │   ├── dedup.py            # Deduplication utilities
+│   ├── health.py           # Health assessment
 │   ├── scheduler.py        # Task scheduling
 │   ├── webhooks.py         # Webhook notifications
 │   ├── plugins.py          # Plugin system
 │   ├── logging_config.py   # Logging configuration
 │   ├── api_server.py       # REST API server
+│   ├── auth.py             # API authentication
+│   ├── retry.py            # Error recovery
+│   ├── i18n.py             # Multi-language support
+│   ├── scrape_progress.py  # Resume support
+│   ├── backup.py           # Database backup
+│   ├── config_watcher.py   # Config hot reload
+│   ├── secure_storage.py   # Token encryption
 │   ├── api/
 │   │   ├── github.py       # GitHub API client
 │   │   └── rate_limiter.py # Token bucket rate limiter
@@ -151,9 +197,13 @@ github-ai-scraper/
 │   │   └── ai_filter.py    # AI relevance filter
 │   ├── output/
 │   │   ├── markdown.py     # Markdown exporter
-│   │   └ html.py           # HTML exporter
+│   │   ├── html.py         # HTML exporter
+│   │   ├── excel.py        # Excel exporter
+│   │   └── rss.py          # RSS exporter
 │   └── storage/
-│       └── database.py     # SQLite storage
+│       ├── database.py     # SQLite storage (sync)
+│       └── async_database.py # SQLite storage (async)
+├── plugins/                # Example plugins
 ├── tests/                  # Test suite
 ├── Dockerfile              # Docker support
 ├── docker-compose.yml      # Docker compose
