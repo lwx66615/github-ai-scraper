@@ -154,6 +154,61 @@ class GitHubClient:
 
         return [self._parse_repository(item) for item in items]
 
+    async def search_repositories_concurrent(
+        self,
+        query: str,
+        max_pages: int = 5,
+        per_page: int = 100,
+        sort: str = "stars",
+        order: str = "desc",
+        max_concurrent: int = 5,
+    ) -> list[Repository]:
+        """Search repositories concurrently across multiple pages.
+
+        Args:
+            query: Search query.
+            max_pages: Maximum number of pages to fetch.
+            per_page: Results per page (max 100).
+            sort: Sort field (stars, forks, updated).
+            order: Sort order (asc, desc).
+            max_concurrent: Maximum concurrent requests.
+
+        Returns:
+            List of repositories from all pages.
+        """
+        import asyncio
+
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def fetch_page(page: int) -> list[Repository]:
+            async with semaphore:
+                params = {
+                    "q": query,
+                    "sort": sort,
+                    "order": order,
+                    "page": page,
+                    "per_page": min(per_page, 100),
+                }
+                data = await self._request("/search/repositories", params)
+                items = data.get("items", [])
+                return [self._parse_repository(item) for item in items]
+
+        # Create tasks for all pages
+        tasks = [fetch_page(page) for page in range(1, max_pages + 1)]
+
+        # Execute concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Flatten results, skipping exceptions
+        all_repos = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning(f"Page fetch failed: {result}")
+                continue
+            all_repos.extend(result)
+
+        return all_repos
+
     async def get_repository(self, owner: str, repo: str) -> Repository:
         """Get a single repository.
 
