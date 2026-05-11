@@ -34,6 +34,7 @@ class GitHubClient:
         token: Optional[str] = None,
         cache_dir: Optional[Path] = None,
         cache_ttl: int = 3600,
+        connection_pool_size: int = 10,
     ):
         """Initialize GitHub client.
 
@@ -41,9 +42,11 @@ class GitHubClient:
             token: GitHub Personal Access Token (optional).
             cache_dir: Directory for cache files (optional).
             cache_ttl: Cache time-to-live in seconds.
+            connection_pool_size: Maximum number of connections in pool.
         """
         self.token = token
         self.session: Optional[aiohttp.ClientSession] = None
+        self.connection_pool_size = connection_pool_size
 
         # Rate limiter: 60/hour without token, 5000/hour with token
         rate = 5000 if token else 60
@@ -55,13 +58,24 @@ class GitHubClient:
             self.cache = RequestCache(cache_dir=cache_dir, ttl=cache_ttl)
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create aiohttp session."""
+        """Get or create aiohttp session with connection pooling."""
         if self.session is None or self.session.closed:
             headers = {"Accept": "application/vnd.github.v3+json"}
             if self.token:
                 headers["Authorization"] = f"token {self.token}"
 
-            self.session = aiohttp.ClientSession(headers=headers)
+            # Configure connection pool
+            connector = aiohttp.TCPConnector(
+                limit=self.connection_pool_size,
+                limit_per_host=self.connection_pool_size,
+                enable_cleanup_closed=True,
+            )
+
+            self.session = aiohttp.ClientSession(
+                headers=headers,
+                connector=connector,
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
         return self.session
 
     async def close(self) -> None:
