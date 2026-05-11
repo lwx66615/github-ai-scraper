@@ -72,3 +72,12 @@ keywords:
 output:
   dir: ./output
   filename: repositories.md
+
+# Webhook notifications (optional)
+webhooks:
+  enabled: false
+  endpoints:
+    - url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+      events: [scrape_complete, trending_found]
+    - url: https://api.telegram.org/botYOUR_BOT_TOKEN/sendMessage
+      events: [scrape_complete]

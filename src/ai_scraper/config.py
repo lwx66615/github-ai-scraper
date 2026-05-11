@@ -80,6 +80,22 @@ class OutputConfig:
 
 
 @dataclass
+class WebhookEndpointConfig:
+    """Webhook endpoint configuration."""
+
+    url: str = ""
+    events: list[str] = field(default_factory=list)
+
+
+@dataclass
+class WebhooksConfig:
+    """Webhooks configuration."""
+
+    enabled: bool = False
+    endpoints: list[WebhookEndpointConfig] = field(default_factory=list)
+
+
+@dataclass
 class Config:
     """Main configuration."""
 
@@ -90,6 +106,7 @@ class Config:
     scheduler: SchedulerConfig = field(default_factory=SchedulerConfig)
     keywords: KeywordsConfig = field(default_factory=KeywordsConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    webhooks: WebhooksConfig = field(default_factory=WebhooksConfig)
 
 
 def _substitute_env_vars(value: str) -> str:
@@ -176,6 +193,20 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         filename=output_dict.get("filename", "repositories.md"),
     )
 
+    webhooks_dict = processed_config.get("webhooks", {})
+    endpoints_list = webhooks_dict.get("endpoints", [])
+    endpoints = [
+        WebhookEndpointConfig(
+            url=endpoint.get("url", ""),
+            events=endpoint.get("events", []),
+        )
+        for endpoint in endpoints_list
+    ]
+    webhooks_config = WebhooksConfig(
+        enabled=webhooks_dict.get("enabled", False),
+        endpoints=endpoints,
+    )
+
     return Config(
         github=github,
         filter=filter_config,
@@ -184,4 +215,5 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         scheduler=scheduler_config,
         keywords=keywords_config,
         output=output_config,
+        webhooks=webhooks_config,
     )
