@@ -5,15 +5,35 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel
 
+from ai_scraper.auth import verify_api_key
 from ai_scraper.config import load_config
 from ai_scraper.storage.async_database import AsyncDatabase
 
 
 # Global database instance
 db: Optional[AsyncDatabase] = None
+
+# Authentication enabled flag
+_auth_enabled = False
+
+
+def set_auth_enabled(enabled: bool) -> None:
+    """Enable or disable API authentication."""
+    global _auth_enabled
+    _auth_enabled = enabled
+
+
+async def verify_auth(x_api_key: Optional[str] = Header(None)):
+    """Verify API key if authentication is enabled."""
+    if _auth_enabled and not verify_api_key(x_api_key):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+    return True
 
 
 @asynccontextmanager
@@ -56,7 +76,7 @@ class StatsResponse(BaseModel):
     total_stars: int
 
 
-@app.get("/api/repos", response_model=list[RepositoryResponse])
+@app.get("/api/repos", response_model=list[RepositoryResponse], dependencies=[Depends(verify_auth)])
 async def list_repositories(
     limit: int = Query(default=20, ge=1, le=100),
     sort: str = Query(default="stars", pattern="^(stars|updated|relevance)$"),
@@ -89,7 +109,7 @@ async def list_repositories(
     ]
 
 
-@app.get("/api/repos/{repo_id}", response_model=RepositoryResponse)
+@app.get("/api/repos/{repo_id}", response_model=RepositoryResponse, dependencies=[Depends(verify_auth)])
 async def get_repository(repo_id: int):
     """Get a specific repository by ID."""
     if not db:
@@ -113,7 +133,7 @@ async def get_repository(repo_id: int):
     )
 
 
-@app.get("/api/stats", response_model=StatsResponse)
+@app.get("/api/stats", response_model=StatsResponse, dependencies=[Depends(verify_auth)])
 async def get_stats():
     """Get database statistics."""
     if not db:
@@ -123,7 +143,7 @@ async def get_stats():
     return StatsResponse(**stats)
 
 
-@app.get("/api/trending")
+@app.get("/api/trending", dependencies=[Depends(verify_auth)])
 async def get_trending(
     days: int = Query(default=7, ge=1, le=30),
     limit: int = Query(default=10, ge=1, le=50),
@@ -145,7 +165,7 @@ async def get_trending(
     ]
 
 
-@app.get("/api/search")
+@app.get("/api/search", dependencies=[Depends(verify_auth)])
 async def search_repositories(
     q: str = Query(..., min_length=2),
     limit: int = Query(default=20, ge=1, le=100),
