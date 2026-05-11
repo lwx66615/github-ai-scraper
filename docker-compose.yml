@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ai-scraper:
+    build: .
+    container_name: ai-scraper
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./ai-scraper.yaml:/app/ai-scraper.yaml:ro
+    command: scrape --max-results 100
+
+  # Optional: Redis for distributed caching
+  redis:
+    image: redis:7-alpine
+    container_name: ai-scraper-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    profiles:
+      - distributed
+
+volumes:
+  redis_data:
