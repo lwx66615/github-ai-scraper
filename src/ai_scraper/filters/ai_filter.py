@@ -1,10 +1,15 @@
 """AI-related content filter."""
 
 from ai_scraper.models.repository import Repository, FilterConfig
+from ai_scraper.classifier import RepositoryClassifier, Classification
 
 
 class AIFilter:
     """Filter for detecting AI-related repositories."""
+
+    def __init__(self):
+        """Initialize the AI filter with a classifier."""
+        self._classifier = RepositoryClassifier()
 
     def is_ai_related(self, repo: Repository, config: FilterConfig) -> bool:
         """Check if repository is AI-related.
@@ -74,3 +79,15 @@ class AIFilter:
         score += min(topic_matches * 0.15, 0.4)
 
         return min(score, 1.0)
+
+    def classify(self, repo: Repository) -> Classification:
+        """Classify a repository into an AI category.
+
+        Args:
+            repo: Repository to classify.
+
+        Returns:
+            Classification result with primary category, secondary categories,
+            confidence, tech stack, and maturity assessment.
+        """
+        return self._classifier.classify(repo)
