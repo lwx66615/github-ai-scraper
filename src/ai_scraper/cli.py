@@ -1,6 +1,7 @@
 """CLI entry point for ai-scraper."""
 
 import asyncio
+import io
 import re
 import sys
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ import click
 import rich.table as table
 from rich import print as rprint
 from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 
 from ai_scraper import __version__
 from ai_scraper.api.github import GitHubClient
@@ -22,7 +24,15 @@ from ai_scraper.output.markdown import MarkdownExporter
 from ai_scraper.storage.database import Database
 
 # Create console with UTF-8 encoding for Windows
-console = Console(force_terminal=True)
+# Use a wrapper to ensure UTF-8 encoding for output
+if sys.platform == "win32":
+    # Reconfigure stdout for UTF-8 if needed
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except (OSError, ValueError):
+            pass
+console = Console(force_terminal=True, legacy_windows=False)
 
 
 def clean_text(text: str) -> str:
@@ -102,9 +112,10 @@ def cli(ctx: click.Context, config: Optional[str]):
 @click.option("--max-results", type=int, help="Maximum results to fetch")
 @click.option("--incremental", is_flag=True, help="Only fetch repos updated since last scrape")
 @click.option("--since", type=str, help="Fetch repos updated since date (YYYY-MM-DD or 1d/1w/1m)")
+@click.option("--progress/--no-progress", default=True, help="Show progress bar (default: on)")
 @click.pass_context
 def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[int],
-           incremental: bool, since: Optional[str]):
+           incremental: bool, since: Optional[str], progress: bool):
     """Scrape AI repositories from GitHub."""
     config: Config = ctx.obj["config"]
 
@@ -126,7 +137,7 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
 
     console.print("[bold blue]Starting scrape...[/bold blue]")
 
-    async def run_scrape():
+    async def run_scrape(since_date_inner: Optional[datetime]):
         client = GitHubClient(token=config.github.token)
         db = Database(Path(config.database.path))
         db.init_db()
@@ -142,64 +153,120 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
 
         try:
             # Handle incremental mode
-            if incremental and since_date is None:
+            if incremental and since_date_inner is None:
                 last_scrape = db.get_last_scrape_time()
                 if last_scrape:
-                    since_date = last_scrape
-                    console.print(f"[dim]Incremental mode: fetching repos since last scrape ({last_scrape})[/dim]")
+                    since_date_inner = last_scrape
+                    if not progress:
+                        console.print(f"[dim]Incremental mode: fetching repos since last scrape ({last_scrape})[/dim]")
                 else:
-                    console.print("[dim]Incremental mode: no previous scrape found, fetching all repos[/dim]")
+                    if not progress:
+                        console.print("[dim]Incremental mode: no previous scrape found, fetching all repos[/dim]")
 
             # Build search query
             topics_query = " ".join(f"topic:{t}" for t in config.filter.topics[:5])
             query = f"stars:>{config.filter.min_stars} {topics_query}"
 
             # Add date filter if incremental
-            if since_date:
+            if since_date_inner:
                 # GitHub API expects YYYY-MM-DD format
-                date_str = since_date.strftime('%Y-%m-%d')
+                date_str = since_date_inner.strftime('%Y-%m-%d')
                 query += f" pushed:>{date_str}"
-                console.print(f"[dim]Query: {query} (incremental)[/dim]")
+                if not progress:
+                    console.print(f"[dim]Query: {query} (incremental)[/dim]")
             else:
-                console.print(f"[dim]Query: {query}[/dim]")
+                if not progress:
+                    console.print(f"[dim]Query: {query}[/dim]")
 
             # Search repositories
             all_repos = []
             page = 1
             per_page = 100
+            max_results = config.scrape.max_results
 
-            while len(all_repos) < config.scrape.max_results:
-                repos = await client.search_repositories(
-                    query=query,
-                    sort="stars",
-                    order="desc",
-                    page=page,
-                    per_page=per_page,
-                )
+            if progress:
+                # Use progress bar
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    TaskProgressColumn(),
+                    console=console,
+                ) as progress_bar:
+                    task = progress_bar.add_task(
+                        "[cyan]Scraping AI repositories...",
+                        total=max_results
+                    )
 
-                if not repos:
-                    break
+                    while len(all_repos) < max_results:
+                        repos = await client.search_repositories(
+                            query=query,
+                            sort="stars",
+                            order="desc",
+                            page=page,
+                            per_page=per_page,
+                        )
 
-                # Filter AI-related repos
-                filter_config = FilterConfigModel(
-                    keywords=config.filter.keywords,
-                    topics=config.filter.topics,
-                    languages=config.filter.languages,
-                    exclude_keywords=config.filter.exclude_keywords,
-                    min_stars=config.filter.min_stars,
-                )
+                        if not repos:
+                            break
 
-                for repo in repos:
-                    if filter_instance.is_ai_related(repo, filter_config):
-                        score = filter_instance.score_relevance(repo)
-                        db.save_repository(repo, relevance_score=score)
-                        all_repos.append(repo)
+                        # Filter AI-related repos
+                        filter_config = FilterConfigModel(
+                            keywords=config.filter.keywords,
+                            topics=config.filter.topics,
+                            languages=config.filter.languages,
+                            exclude_keywords=config.filter.exclude_keywords,
+                            min_stars=config.filter.min_stars,
+                        )
 
-                console.print(f"[dim]Page {page}: found {len(repos)} repos, {len(all_repos)} total AI-related[/dim]")
-                page += 1
+                        for repo in repos:
+                            if filter_instance.is_ai_related(repo, filter_config):
+                                score = filter_instance.score_relevance(repo)
+                                db.save_repository(repo, relevance_score=score)
+                                all_repos.append(repo)
+                                progress_bar.update(task, completed=len(all_repos))
 
-                if len(repos) < per_page:
-                    break
+                        page += 1
+
+                        if len(repos) < per_page:
+                            break
+
+                    # Ensure progress shows final count
+                    progress_bar.update(task, completed=len(all_repos))
+            else:
+                # No progress bar - use original console output
+                while len(all_repos) < max_results:
+                    repos = await client.search_repositories(
+                        query=query,
+                        sort="stars",
+                        order="desc",
+                        page=page,
+                        per_page=per_page,
+                    )
+
+                    if not repos:
+                        break
+
+                    # Filter AI-related repos
+                    filter_config = FilterConfigModel(
+                        keywords=config.filter.keywords,
+                        topics=config.filter.topics,
+                        languages=config.filter.languages,
+                        exclude_keywords=config.filter.exclude_keywords,
+                        min_stars=config.filter.min_stars,
+                    )
+
+                    for repo in repos:
+                        if filter_instance.is_ai_related(repo, filter_config):
+                            score = filter_instance.score_relevance(repo)
+                            db.save_repository(repo, relevance_score=score)
+                            all_repos.append(repo)
+
+                    console.print(f"[dim]Page {page}: found {len(repos)} repos, {len(all_repos)} total AI-related[/dim]")
+                    page += 1
+
+                    if len(repos) < per_page:
+                        break
 
             if all_repos:
                 console.print("[dim]Extracting keywords...[/dim]")
@@ -219,7 +286,7 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
             await client.close()
             db.close()
 
-    asyncio.run(run_scrape())
+    asyncio.run(run_scrape(since_date))
 
 
 @cli.command("list")
