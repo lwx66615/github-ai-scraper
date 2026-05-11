@@ -458,7 +458,7 @@ def db_clean(ctx: click.Context, days: int):
 
 
 @db_cmd.command("export")
-@click.option("--format", "-f", type=click.Choice(["csv", "json"]), default="csv")
+@click.option("--format", "-f", type=click.Choice(["csv", "json", "html"]), default="csv")
 @click.option("--output", "-o", type=click.Path(), default="export.csv")
 @click.pass_context
 def db_export(ctx: click.Context, format: str, output: str):
@@ -512,6 +512,12 @@ def db_export(ctx: click.Context, format: str, output: str):
             json.dump(data, f, indent=2)
 
         console.print(f"[green]Exported {len(repos)} repositories to {output}[/green]")
+
+    elif format == "html":
+        from ai_scraper.output.html import HTMLExporter
+        exporter = HTMLExporter(Path(config.output.dir), filename=output)
+        path = exporter.export_repositories(repos)
+        console.print(f"[green]Exported {len(repos)} repositories to {path}[/green]")
 
     db.close()
 
@@ -607,8 +613,8 @@ def interactive(ctx: click.Context):
             # Trending
             ctx.invoke(trending)
         elif choice == "6":
-            # Export - only offer csv and json formats as those are available
-            format_choice = Prompt.ask("Export format", choices=["csv", "json"], default="csv")
+            # Export
+            format_choice = Prompt.ask("Export format", choices=["csv", "json", "html"], default="csv")
             ctx.invoke(db_export, format=format_choice, output=f"export.{format_choice}")
         elif choice == "7":
             # Settings
