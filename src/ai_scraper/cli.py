@@ -577,6 +577,44 @@ def keywords_clear(ctx: click.Context):
 cli.add_command(keywords_cmd, name="keywords")
 
 
+@cli.command()
+@click.pass_context
+def interactive(ctx: click.Context):
+    """Start interactive mode with menu-driven interface."""
+    from ai_scraper.interactive import show_main_menu, get_scrape_params
+    from rich.prompt import Prompt
+
+    while True:
+        choice = show_main_menu()
+
+        if choice == "q":
+            console.print("\n[cyan]Goodbye![/cyan]")
+            break
+        elif choice == "1":
+            # Quick scrape
+            ctx.invoke(scrape, max_results=50)
+        elif choice == "2":
+            # Deep scrape
+            ctx.invoke(scrape, max_results=500)
+        elif choice == "3":
+            # Custom scrape
+            params = get_scrape_params()
+            ctx.invoke(scrape, **params)
+        elif choice == "4":
+            # View results
+            ctx.invoke(list_repos)
+        elif choice == "5":
+            # Trending
+            ctx.invoke(trending)
+        elif choice == "6":
+            # Export - only offer csv and json formats as those are available
+            format_choice = Prompt.ask("Export format", choices=["csv", "json"], default="csv")
+            ctx.invoke(db_export, format=format_choice, output=f"export.{format_choice}")
+        elif choice == "7":
+            # Settings
+            ctx.invoke(config_show)
+
+
 def main():
     """Main entry point."""
     cli()
