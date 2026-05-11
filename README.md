@@ -1,5 +1,7 @@
 # GitHub AI Scraper
 
+English | [简体中文](README_CN.md)
+
 A CLI tool for scraping AI-related high-star repositories from GitHub.
 
 ## Features
