@@ -3,11 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import aiohttp
 
 from ai_scraper.api.rate_limiter import RateLimitInfo, RateLimiter
+from ai_scraper.cache import RequestCache
 from ai_scraper.models.repository import Repository
 
 logger = logging.getLogger(__name__)
@@ -27,11 +29,18 @@ class GitHubClient:
 
     BASE_URL = "https://api.github.com"
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(
+        self,
+        token: Optional[str] = None,
+        cache_dir: Optional[Path] = None,
+        cache_ttl: int = 3600,
+    ):
         """Initialize GitHub client.
 
         Args:
             token: GitHub Personal Access Token (optional).
+            cache_dir: Directory for cache files (optional).
+            cache_ttl: Cache time-to-live in seconds.
         """
         self.token = token
         self.session: Optional[aiohttp.ClientSession] = None
@@ -39,6 +48,11 @@ class GitHubClient:
         # Rate limiter: 60/hour without token, 5000/hour with token
         rate = 5000 if token else 60
         self.rate_limiter = RateLimiter(requests_per_hour=rate)
+
+        # Request cache
+        self.cache: Optional[RequestCache] = None
+        if cache_dir:
+            self.cache = RequestCache(cache_dir=cache_dir, ttl=cache_ttl)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
@@ -68,6 +82,15 @@ class GitHubClient:
         Raises:
             GitHubAPIError: On API errors.
         """
+        url = f"{self.BASE_URL}{endpoint}"
+
+        # Check cache first
+        if self.cache:
+            cached = self.cache.get(url, params)
+            if cached is not None:
+                logger.debug(f"Cache hit for {endpoint}")
+                return cached
+
         # Wait for rate limiter
         while not self.rate_limiter.try_acquire():
             wait_time = self.rate_limiter.wait_time()
@@ -75,7 +98,6 @@ class GitHubClient:
             await asyncio.sleep(min(wait_time, 1.0))
 
         session = await self._get_session()
-        url = f"{self.BASE_URL}{endpoint}"
 
         async with session.get(url, params=params) as response:
             if response.status == 401:
@@ -90,7 +112,14 @@ class GitHubClient:
                 text = await response.text()
                 raise GitHubAPIError(response.status, text)
 
-            return await response.json()
+            data = await response.json()
+
+            # Cache successful response
+            if self.cache:
+                self.cache.set(url, params, data)
+                logger.debug(f"Cached response for {endpoint}")
+
+            return data
 
     async def search_repositories(
         self,

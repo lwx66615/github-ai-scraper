@@ -1,6 +1,7 @@
 """Tests for GitHub API client."""
 
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -171,5 +172,142 @@ async def test_github_api_error():
             await client.search_repositories("ai")
 
         assert exc_info.value.status == 401
+
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_github_client_with_cache(tmp_path):
+    """Test GitHub client with caching enabled."""
+    cache_dir = tmp_path / "cache"
+
+    mock_response = AsyncMock()
+    mock_response.status = 200
+    mock_response.json = AsyncMock(return_value={
+        "items": [
+            {
+                "id": 456,
+                "name": "cached-repo",
+                "full_name": "owner/cached-repo",
+                "description": "Cached repo",
+                "stargazers_count": 500,
+                "language": "Python",
+                "topics": ["cache"],
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-05-01T00:00:00Z",
+                "pushed_at": "2024-05-09T00:00:00Z",
+                "html_url": "https://github.com/owner/cached-repo",
+            }
+        ]
+    })
+
+    async_context_manager = AsyncMock()
+    async_context_manager.__aenter__.return_value = mock_response
+    async_context_manager.__aexit__.return_value = None
+
+    mock_session = MagicMock()
+    mock_session.get.return_value = async_context_manager
+    mock_session.closed = False
+    mock_session.close = AsyncMock()
+
+    with patch("ai_scraper.api.github.aiohttp.ClientSession") as mock_client_session:
+        mock_client_session.return_value = mock_session
+        mock_client_session.return_value.headers = {}
+
+        client = GitHubClient(cache_dir=cache_dir)
+
+        # First call - should hit API
+        repos = await client.search_repositories("test")
+        assert len(repos) == 1
+        assert repos[0].name == "owner/cached-repo"
+
+        # Verify cache was created
+        assert client.cache is not None
+        stats = client.cache.get_stats()
+        assert stats["file_count"] == 1
+
+        # Second call - should hit cache (mock not called again)
+        repos2 = await client.search_repositories("test")
+        assert len(repos2) == 1
+
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_github_client_cache_miss(tmp_path):
+    """Test GitHub client cache miss makes API call."""
+    cache_dir = tmp_path / "cache"
+
+    # Use a simple approach - different URLs produce different cache keys
+    mock_response1 = AsyncMock()
+    mock_response1.status = 200
+    mock_response1.json = AsyncMock(return_value={
+        "id": 1,
+        "name": "owner/repo1",
+        "full_name": "owner/repo1",
+        "description": "Test 1",
+        "stargazers_count": 100,
+        "language": "Python",
+        "topics": [],
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-05-01T00:00:00Z",
+        "pushed_at": "2024-05-09T00:00:00Z",
+        "html_url": "https://github.com/owner/repo1",
+    })
+
+    mock_response2 = AsyncMock()
+    mock_response2.status = 200
+    mock_response2.json = AsyncMock(return_value={
+        "id": 2,
+        "name": "owner/repo2",
+        "full_name": "owner/repo2",
+        "description": "Test 2",
+        "stargazers_count": 200,
+        "language": "Python",
+        "topics": [],
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-05-01T00:00:00Z",
+        "pushed_at": "2024-05-09T00:00:00Z",
+        "html_url": "https://github.com/owner/repo2",
+    })
+
+    call_count = 0
+
+    def get_context_manager(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        async_context_manager = AsyncMock()
+        if call_count == 1:
+            async_context_manager.__aenter__.return_value = mock_response1
+        else:
+            async_context_manager.__aenter__.return_value = mock_response2
+        async_context_manager.__aexit__.return_value = None
+        return async_context_manager
+
+    mock_session = MagicMock()
+    mock_session.get = get_context_manager
+    mock_session.closed = False
+    mock_session.close = AsyncMock()
+
+    with patch("ai_scraper.api.github.aiohttp.ClientSession") as mock_client_session:
+        mock_client_session.return_value = mock_session
+        mock_client_session.return_value.headers = {}
+
+        client = GitHubClient(cache_dir=cache_dir)
+
+        # First call - cache miss, should make API call
+        repo1 = await client.get_repository("owner", "repo1")
+        assert repo1.id == 1
+
+        # Same call - cache hit
+        repo1_cached = await client.get_repository("owner", "repo1")
+        assert repo1_cached.id == 1
+
+        # Different repo - cache miss, should make API call
+        repo2 = await client.get_repository("owner", "repo2")
+        assert repo2.id == 2
+
+        # Verify only 2 API calls were made (first and third requests)
+        assert call_count == 2
 
         await client.close()
