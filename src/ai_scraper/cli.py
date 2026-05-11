@@ -584,6 +584,17 @@ cli.add_command(keywords_cmd, name="keywords")
 
 
 @cli.command()
+@click.option("--host", default="0.0.0.0", help="Server host")
+@click.option("--port", default=8080, help="Server port")
+@click.pass_context
+def serve(ctx: click.Context, host: str, port: int):
+    """Start REST API server."""
+    from ai_scraper.api_server import run_server
+    console.print(f"[bold green]Starting API server at http://{host}:{port}[/bold green]")
+    run_server(host=host, port=port)
+
+
+@cli.command()
 @click.pass_context
 def interactive(ctx: click.Context):
     """Start interactive mode with menu-driven interface."""
