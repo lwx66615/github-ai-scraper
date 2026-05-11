@@ -52,4 +52,8 @@ cmd/scheduler/scheduler.exe
 
 # Generated files
 keywords.txt
-output/
+output/*.json
+output/*.csv
+output/*.html
+output/*.db
+output/*.sqlite

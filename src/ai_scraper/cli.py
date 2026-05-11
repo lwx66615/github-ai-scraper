@@ -163,9 +163,10 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                     if not progress:
                         console.print("[dim]Incremental mode: no previous scrape found, fetching all repos[/dim]")
 
-            # Build search query
-            topics_query = " ".join(f"topic:{t}" for t in config.filter.topics[:5])
-            query = f"stars:>{config.filter.min_stars} {topics_query}"
+            # Build search query - use single topic for broader results
+            # GitHub search API has issues with OR queries, use primary topic
+            primary_topic = config.filter.topics[0] if config.filter.topics else "ai"
+            query = f"stars:>{config.filter.min_stars} topic:{primary_topic}"
 
             # Add date filter if incremental
             if since_date_inner:
@@ -458,7 +459,7 @@ def db_clean(ctx: click.Context, days: int):
 
 
 @db_cmd.command("export")
-@click.option("--format", "-f", type=click.Choice(["csv", "json", "html"]), default="csv")
+@click.option("--format", "-f", type=click.Choice(["csv", "json", "html", "markdown"]), default="csv")
 @click.option("--output", "-o", type=click.Path(), default="export.csv")
 @click.pass_context
 def db_export(ctx: click.Context, format: str, output: str):
@@ -516,6 +517,12 @@ def db_export(ctx: click.Context, format: str, output: str):
     elif format == "html":
         from ai_scraper.output.html import HTMLExporter
         exporter = HTMLExporter(Path(config.output.dir), filename=output)
+        path = exporter.export_repositories(repos)
+        console.print(f"[green]Exported {len(repos)} repositories to {path}[/green]")
+
+    elif format == "markdown":
+        from ai_scraper.output.markdown import MarkdownExporter
+        exporter = MarkdownExporter(Path(config.output.dir), filename=output)
         path = exporter.export_repositories(repos)
         console.print(f"[green]Exported {len(repos)} repositories to {path}[/green]")
 
