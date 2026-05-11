@@ -9,11 +9,11 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from ai_scraper.config import load_config
-from ai_scraper.storage.database import Database
+from ai_scraper.storage.async_database import AsyncDatabase
 
 
 # Global database instance
-db: Optional[Database] = None
+db: Optional[AsyncDatabase] = None
 
 
 @asynccontextmanager
@@ -21,12 +21,12 @@ async def lifespan(app: FastAPI):
     """Manage application lifecycle."""
     global db
     config = load_config()
-    db = Database(Path(config.database.path))
+    db = AsyncDatabase(Path(config.database.path))
     if Path(config.database.path).exists():
-        db.init_db()
+        await db.init_db()
     yield
     if db:
-        db.close()
+        await db.close()
 
 
 app = FastAPI(
@@ -64,10 +64,10 @@ async def list_repositories(
     min_stars: Optional[int] = None,
 ):
     """List repositories with optional filters."""
-    if not db or not db.conn:
+    if not db:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    repos = db.get_all_repositories(limit=limit, sort_by=sort)
+    repos = await db.get_all_repositories(limit=limit, sort_by=sort)
 
     if language:
         repos = [r for r in repos if r.language and r.language.lower() == language.lower()]
@@ -92,11 +92,11 @@ async def list_repositories(
 @app.get("/api/repos/{repo_id}", response_model=RepositoryResponse)
 async def get_repository(repo_id: int):
     """Get a specific repository by ID."""
-    if not db or not db.conn:
+    if not db:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    repos = db.get_all_repositories(limit=10000)
-    repo = next((r for r in repos if r.id == repo_id), None)
+    # Use direct query instead of full scan
+    repo = await db.get_repository_by_id(repo_id)
 
     if not repo:
         raise HTTPException(status_code=404, detail="Repository not found")
@@ -116,10 +116,10 @@ async def get_repository(repo_id: int):
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats():
     """Get database statistics."""
-    if not db or not db.conn:
+    if not db:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    stats = db.get_stats()
+    stats = await db.get_stats()
     return StatsResponse(**stats)
 
 
@@ -129,10 +129,10 @@ async def get_trending(
     limit: int = Query(default=10, ge=1, le=50),
 ):
     """Get trending repositories."""
-    if not db or not db.conn:
+    if not db:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    trends = db.get_trending(days=days, limit=limit)
+    trends = await db.get_trending(days=days, limit=limit)
     return [
         {
             "repo_id": t.repo_id,
@@ -151,10 +151,10 @@ async def search_repositories(
     limit: int = Query(default=20, ge=1, le=100),
 ):
     """Search repositories by name or description."""
-    if not db or not db.conn:
+    if not db:
         raise HTTPException(status_code=503, detail="Database not available")
 
-    repos = db.search_local(query=q, limit=limit)
+    repos = await db.search_local(query=q, limit=limit)
     return [
         RepositoryResponse(
             id=r.id,
