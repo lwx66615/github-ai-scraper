@@ -28,6 +28,20 @@ STOPWORDS: set[str] = {
     "itself", "they", "them", "their", "theirs", "themselves",
 }
 
+# 无效关键词模式（需要过滤掉）
+INVALID_PATTERNS = [
+    r'^\d+/\w+$',       # 数字/单词模式，如 "0/zero", "112/ai"
+    r'^[\w-]+/[\w-]+$', # 路径模式，如 "owner/repo"
+    r'^\d+$',           # 纯数字
+]
+
+# 最小关键词长度（AI 相关缩写例外）
+MIN_KEYWORD_LENGTH = 3
+VALID_SHORT_KEYWORDS = {
+    "ai", "ml", "dl", "nlp", "cv", "llm", "gpt", "rag", "mcp",
+    "rnn", "cnn", "gan", "vae", "rl", "cl", "asr", "tts",
+}
+
 
 class KeywordExtractor:
     """Extract and manage keywords from repository metadata."""
@@ -86,7 +100,52 @@ class KeywordExtractor:
             keywords.update(self._extract_from_topics(repo))
             keywords.update(self._extract_from_description(repo))
             keywords.update(self._extract_from_name(repo))
-        return keywords
+
+        # Apply quality filter
+        return self._filter_keywords(keywords)
+
+    def _filter_keywords(self, keywords: set[str]) -> set[str]:
+        """Filter out low-quality keywords.
+
+        Args:
+            keywords: Set of keywords to filter.
+
+        Returns:
+            Filtered set of high-quality keywords.
+        """
+        filtered: set[str] = set()
+
+        for keyword in keywords:
+            keyword_lower = keyword.lower()
+
+            # Skip if matches invalid patterns
+            skip = False
+            for pattern in INVALID_PATTERNS:
+                if re.match(pattern, keyword_lower):
+                    skip = True
+                    break
+
+            if skip:
+                continue
+
+            # Check minimum length
+            if len(keyword_lower) < MIN_KEYWORD_LENGTH:
+                # Allow known short AI terms
+                if keyword_lower not in VALID_SHORT_KEYWORDS:
+                    continue
+
+            # Skip if it looks like a file path with extension
+            if '.' in keyword_lower and not keyword_lower.startswith('.'):
+                continue
+
+            # Skip if it's mostly numbers
+            digit_count = sum(1 for c in keyword_lower if c.isdigit())
+            if digit_count > len(keyword_lower) * 0.5:
+                continue
+
+            filtered.add(keyword_lower)
+
+        return filtered
 
     def _extract_from_topics(self, repo: Repository) -> set[str]:
         """Extract keywords from repository topics.
