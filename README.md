@@ -162,6 +162,8 @@ webhooks:
 | `ai-scraper config show` | Show current config |
 | `ai-scraper db stats` | Show database statistics |
 | `ai-scraper db export` | Export data to CSV/JSON/HTML/Excel/RSS |
+| `ai-scraper db clean --invalid` | Remove repositories with invalid data |
+| `ai-scraper db clean --vacuum` | Optimize database size |
 | `ai-scraper db backup` | Create database backup |
 | `ai-scraper db restore` | Restore from backup |
 | `ai-scraper db backups` | List available backups |

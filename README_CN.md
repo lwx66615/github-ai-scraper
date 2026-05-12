@@ -147,6 +147,8 @@ webhooks:
 | `ai-scraper config show` | 显示当前配置 |
 | `ai-scraper db stats` | 显示数据库统计 |
 | `ai-scraper db export` | 导出数据为 CSV/JSON/HTML/Excel/RSS |
+| `ai-scraper db clean --invalid` | 删除无效数据的仓库 |
+| `ai-scraper db clean --vacuum` | 优化数据库大小 |
 | `ai-scraper db backup` | 创建数据库备份 |
 | `ai-scraper db restore` | 从备份恢复 |
 | `ai-scraper db backups` | 列出可用备份 |
