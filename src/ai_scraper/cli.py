@@ -488,9 +488,18 @@ def db_stats(ctx: click.Context):
 
 @db_cmd.command("clean")
 @click.option("--days", type=int, default=30, help="Keep snapshots from last N days")
+@click.option("--invalid", is_flag=True, help="Remove repos with invalid data")
+@click.option("--vacuum", is_flag=True, help="Optimize database size")
 @click.pass_context
-def db_clean(ctx: click.Context, days: int):
-    """Clean old snapshots."""
+def db_clean(ctx: click.Context, days: int, invalid: bool, vacuum: bool):
+    """Clean and optimize database.
+
+    Examples:
+        ai-scraper db clean --days 30        # Clean old snapshots
+        ai-scraper db clean --invalid        # Remove invalid repos
+        ai-scraper db clean --vacuum         # Optimize database
+        ai-scraper db clean --invalid --vacuum  # Both
+    """
     config: Config = ctx.obj["config"]
     db = Database(Path(config.database.path))
 
@@ -499,9 +508,22 @@ def db_clean(ctx: click.Context, days: int):
         return
 
     db.init_db()
-    deleted = db.clean_old_snapshots(days=days)
 
-    console.print(f"[green]Deleted {deleted} old snapshots[/green]")
+    # Clean old snapshots (default behavior)
+    if not invalid and not vacuum:
+        deleted = db.clean_old_snapshots(days=days)
+        console.print(f"[green]Deleted {deleted} old snapshots[/green]")
+
+    # Remove invalid repos
+    if invalid:
+        removed = db.clean_invalid_repos()
+        console.print(f"[green]Removed {removed} invalid repositories[/green]")
+
+    # Optimize database
+    if vacuum:
+        db.vacuum()
+        console.print("[green]Database optimized[/green]")
+
     db.close()
 
 

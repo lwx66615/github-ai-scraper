@@ -427,6 +427,26 @@ class Database:
         cursor.execute("VACUUM")
         self.conn.commit()
 
+    def clean_invalid_repos(self) -> int:
+        """Remove repositories with invalid or missing required data.
+
+        Returns:
+            Number of removed repositories.
+        """
+        cursor = self.conn.cursor()
+
+        # Remove repos with NULL name or empty URL
+        cursor.execute("""
+            DELETE FROM repositories
+            WHERE name IS NULL OR name = ''
+               OR url IS NULL OR url = ''
+        """)
+
+        removed = cursor.rowcount
+        self.conn.commit()
+
+        return removed
+
     def close(self) -> None:
         """Close database connection."""
         if self.conn:
