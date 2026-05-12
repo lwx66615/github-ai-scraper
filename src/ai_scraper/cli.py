@@ -249,6 +249,8 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                             if filter_instance.is_ai_related(repo, filter_config):
                                 score = filter_instance.score_relevance(repo)
                                 db.save_repository(repo, relevance_score=score)
+                                # Save snapshot for trend analysis
+                                db.save_snapshot(repo.id, repo.stars, datetime.now())
                                 all_repos.append(repo)
                                 progress_bar.update(task, completed=len(all_repos))
 
@@ -302,6 +304,8 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                         if filter_instance.is_ai_related(repo, filter_config):
                             score = filter_instance.score_relevance(repo)
                             db.save_repository(repo, relevance_score=score)
+                            # Save snapshot for trend analysis
+                            db.save_snapshot(repo.id, repo.stars, datetime.now())
                             all_repos.append(repo)
 
                     # 检查是否达到限制
