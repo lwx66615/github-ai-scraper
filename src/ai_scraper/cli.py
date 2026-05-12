@@ -244,11 +244,17 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                         )
 
                         for repo in repos:
+                            if len(all_repos) >= max_results:
+                                break  # 达到限制，停止添加
                             if filter_instance.is_ai_related(repo, filter_config):
                                 score = filter_instance.score_relevance(repo)
                                 db.save_repository(repo, relevance_score=score)
                                 all_repos.append(repo)
                                 progress_bar.update(task, completed=len(all_repos))
+
+                        # 检查是否达到限制
+                        if len(all_repos) >= max_results:
+                            break
 
                         page += 1
 
@@ -291,10 +297,16 @@ def scrape(ctx: click.Context, min_stars: Optional[int], max_results: Optional[i
                     )
 
                     for repo in repos:
+                        if len(all_repos) >= max_results:
+                            break  # 达到限制，停止添加
                         if filter_instance.is_ai_related(repo, filter_config):
                             score = filter_instance.score_relevance(repo)
                             db.save_repository(repo, relevance_score=score)
                             all_repos.append(repo)
+
+                    # 检查是否达到限制
+                    if len(all_repos) >= max_results:
+                        break
 
                     console.print(f"[dim]Page {page}: found {len(repos)} repos, {len(all_repos)} total AI-related[/dim]")
                     page += 1
