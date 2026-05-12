@@ -239,6 +239,7 @@ def translate_description(description: Optional[str]) -> str:
 
     Uses a dictionary-based approach for common AI terms.
     For descriptions that are already in Chinese, returns as-is.
+    For mixed content, preserves readability.
 
     Args:
         description: Original English description.
@@ -257,6 +258,10 @@ def translate_description(description: Optional[str]) -> str:
     # Clean the description
     cleaned = " ".join(description.split())
 
+    # Don't translate if it's very short (likely a name or brand)
+    if len(cleaned) < 20:
+        return cleaned
+
     # Sort by length (longest first) to avoid partial matches
     sorted_terms = sorted(TRANSLATION_DICT.keys(), key=len, reverse=True)
 
@@ -273,6 +278,14 @@ def translate_description(description: Optional[str]) -> str:
     translated = re.sub(r'开发ment', '开发', translated)
     translated = re.sub(r'集成s', '集成', translated)
     translated = re.sub(r'构建ing', '构建', translated)
+    translated = re.sub(r'分析er', '分析器', translated)
+    translated = re.sub(r'生成ive', '生成式', translated)
+
+    # If translation made it worse (too many fragments), return original
+    chinese_ratio = len(re.findall(r'[\u4e00-\u9fff]', translated)) / max(len(translated), 1)
+    if 0.1 < chinese_ratio < 0.3:
+        # Partial translation, might be awkward - return original
+        return description
 
     return translated
 
