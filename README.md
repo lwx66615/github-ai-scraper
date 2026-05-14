@@ -34,7 +34,11 @@ A CLI tool for scraping AI-related high-star repositories from GitHub and GitLab
 ## Installation
 
 ```bash
-pip install -e .
+# Install from PyPI
+pip install ai-scraper
+
+# Or install from source for development
+pip install -e ".[dev]"
 ```
 
 ## Quick Start

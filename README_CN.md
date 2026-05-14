@@ -33,7 +33,11 @@
 ## 安装
 
 ```bash
-pip install -e .
+# 从 PyPI 安装
+pip install ai-scraper
+
+# 或从源码安装（用于开发）
+pip install -e ".[dev]"
 ```
 
 ## 快速开始
