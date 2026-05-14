@@ -205,7 +205,7 @@ github-ai-scraper/
 │   │   ├── markdown.py     # Markdown 导出器
 │   │   ├── html.py         # HTML 导出器
 │   │   ├── excel.py        # Excel 导出器
-│   │   └and rss.py          # RSS 导出器
+│   │   └── rss.py          # RSS 导出器
 │   └── storage/
 │       ├── database.py     # SQLite 存储（同步）
 │       └── async_database.py # SQLite 存储（异步）
