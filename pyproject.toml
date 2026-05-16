@@ -1,6 +1,6 @@
 [project]
 name = "ai-scraper"
-version = "0.1.0"
+version = "0.1.1"
 description = "A CLI tool for discovering and scraping AI-related high-star repositories from GitHub and GitLab"
 readme = "README.md"
 license = "MIT"

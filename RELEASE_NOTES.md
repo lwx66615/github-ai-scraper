@@ -1,4 +1,4 @@
-# Release Notes for v0.1.0
+# Release Notes for v0.1.1
 
 ## GitHub/GitLab AI Scraper
 
@@ -49,4 +49,4 @@ ai-scraper db export --format markdown --output repos.md
 
 ---
 
-**Full Changelog**: https://github.com/lwx66615/github-ai-scraper/commits/v0.1.0
+**Full Changelog**: https://github.com/lwx66615/github-ai-scraper/compare/v0.1.0...v0.1.1
