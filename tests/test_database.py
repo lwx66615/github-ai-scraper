@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from ai_scraper.models.repository import Repository
 from ai_scraper.storage.database import Database
@@ -154,6 +155,60 @@ def test_get_trending(temp_db):
     assert trending[2].repo_id == 3  # 20% growth
 
 
+def test_database_remove_duplicates(temp_db):
+    """Saving the same repository twice should update one record, not duplicate it."""
+    repo = Repository(
+        id=12345,
+        name="test/repo",
+        full_name="test/repo",
+        description="Test repo",
+        stars=1000,
+        language="Python",
+        topics=["ai"],
+        created_at=datetime(2024, 1, 1),
+        updated_at=datetime(2024, 5, 1),
+        pushed_at=datetime(2024, 5, 1),
+        url="https://github.com/test/repo",
+    )
+
+    temp_db.save_repository(repo)
+    temp_db.save_repository(repo)
+
+    repos = temp_db.get_all_repositories(limit=10)
+    assert len(repos) == 1
+
+
+def test_database_clean_invalid_repos(temp_db):
+    """Cleaning should remove repositories with missing required data."""
+    cursor = temp_db.conn.cursor()
+    cursor.execute("""
+        INSERT INTO repositories (id, name, full_name, stars, created_at, updated_at, pushed_at, url)
+        VALUES (999, 'test/bad', 'test/bad', 0, '2024-01-01', '2024-01-01', '2024-01-01', '')
+    """)
+    temp_db.conn.commit()
+
+    removed = temp_db.clean_invalid_repos()
+
+    assert removed >= 1
+
+
+def test_database_vacuum(temp_db):
+    """VACUUM should run without errors."""
+    temp_db.vacuum()
+
+
+def test_cli_db_clean():
+    """Test db clean CLI command is available."""
+    from ai_scraper.cli import cli
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["db", "clean", "--help"])
+
+    assert result.exit_code == 0
+    assert "--invalid" in result.output
+    assert "--vacuum" in result.output
+
+
 def test_search_local(temp_db):
     """Test local search functionality."""
     repos = [
@@ -174,7 +229,7 @@ def test_search_local(temp_db):
             ("ai-toolkit", "AI toolkit"),
             ("ml-lib", "Machine learning library"),
             ("web-app", "Web application"),
-        ])
+        ], start=1)
     ]
 
     for repo in repos:

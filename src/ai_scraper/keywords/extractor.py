@@ -7,6 +7,10 @@ from ai_scraper.models import Repository
 
 
 # Common English stopwords to filter out
+LOW_QUALITY_KEYWORDS = {
+    "aaif",
+}
+
 STOPWORDS: set[str] = {
     "a", "an", "the", "and", "or", "but", "is", "are", "was", "were",
     "be", "been", "being", "have", "has", "had", "do", "does", "did",
@@ -116,7 +120,13 @@ class KeywordExtractor:
         filtered: set[str] = set()
 
         for keyword in keywords:
-            keyword_lower = keyword.lower()
+            keyword_lower = keyword.strip().lower()
+            if not keyword_lower:
+                continue
+
+            # Skip known low-quality tokens discovered from repository noise
+            if keyword_lower in LOW_QUALITY_KEYWORDS:
+                continue
 
             # Skip if matches invalid patterns
             skip = False
@@ -140,7 +150,7 @@ class KeywordExtractor:
 
             # Skip if it's mostly numbers
             digit_count = sum(1 for c in keyword_lower if c.isdigit())
-            if digit_count > len(keyword_lower) * 0.5:
+            if digit_count >= len(keyword_lower) * 0.5:
                 continue
 
             filtered.add(keyword_lower)

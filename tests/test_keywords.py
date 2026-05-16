@@ -438,6 +438,60 @@ class TestExtractFromRepos:
         assert keywords == set()
 
 
+class TestFilterKeywords:
+    """Tests for keyword quality filtering."""
+
+    def test_keyword_filter_removes_invalid_patterns(self):
+        """Invalid keyword patterns should be filtered out."""
+        extractor = KeywordExtractor(Path("/tmp/test.txt"))
+        invalid_keywords = {
+            "0/zero",
+            "112/ai",
+            "aaif",
+            "csinva/gpt",
+            "mohitkr95/best",
+            "aymara/lima",
+            "explosion/spacy",
+        }
+        valid_keywords = {
+            "machine-learning",
+            "deep-learning",
+            "neural-network",
+            "pytorch",
+            "tensorflow",
+        }
+
+        filtered = extractor._filter_keywords(invalid_keywords | valid_keywords)
+
+        for keyword in invalid_keywords:
+            assert keyword not in filtered
+        for keyword in valid_keywords:
+            assert keyword in filtered
+
+    def test_keyword_filter_requires_min_length(self):
+        """Single-character keywords should be removed but short AI terms kept."""
+        extractor = KeywordExtractor(Path("/tmp/test.txt"))
+        filtered = extractor._filter_keywords({"ai", "ml", "gpt", "a", "ab", "abc"})
+
+        assert "a" not in filtered
+        assert "ab" not in filtered
+        assert "ai" in filtered
+        assert "ml" in filtered
+        assert "gpt" in filtered
+        assert "abc" in filtered
+
+    def test_keyword_filter_removes_files_and_numeric_noise(self):
+        """File-like and mostly numeric keywords should be filtered out."""
+        extractor = KeywordExtractor(Path("/tmp/test.txt"))
+        filtered = extractor._filter_keywords({"model.py", "gpt4", "123abc", "ai", "opencv"})
+
+        assert "model.py" not in filtered
+        assert "123abc" not in filtered
+        assert "gpt4" in filtered
+        assert "ai" in filtered
+        assert "opencv" in filtered
+
+
 class TestMergeKeywords:
     """Tests for merging keywords."""
 

@@ -3,7 +3,7 @@
 import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -198,20 +198,22 @@ class Database:
         """
         cursor = self.conn.cursor()
 
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+
         cursor.execute("""
             SELECT
                 r.id as repo_id,
                 r.name as repo_name,
-                s1.stars as initial_stars,
+                MIN(s1.stars) as initial_stars,
                 r.stars as current_stars
             FROM repositories r
             JOIN snapshots s1 ON r.id = s1.repo_id
-            WHERE s1.snapshot_at >= datetime('now', ?)
+            WHERE s1.snapshot_at >= ?
             GROUP BY r.id
             HAVING current_stars > initial_stars
             ORDER BY (CAST(current_stars AS FLOAT) / initial_stars - 1) DESC
             LIMIT ?
-        """, (f'-{days} days', limit))
+        """, (cutoff, limit))
 
         results = []
         for row in cursor.fetchall():

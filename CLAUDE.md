@@ -70,7 +70,7 @@ export GITLAB_TOKEN=your_token  # For GitLab scraping
 
 **Keyword Extraction** (`src/ai_scraper/keywords/extractor.py`)
 - Extracts keywords from repo topics, descriptions, and names
-- Filters stopwords, requires min 2 chars, excludes pure digits
+- Filters stopwords, numeric/path/file-like noise, and low-quality keywords while preserving short AI terms like `ai` and `ml`
 - Merges with existing keywords respecting `max_keywords` limit
 
 **Configuration** (`src/ai_scraper/config.py`)

@@ -281,12 +281,6 @@ def translate_description(description: Optional[str]) -> str:
     translated = re.sub(r'分析er', '分析器', translated)
     translated = re.sub(r'生成ive', '生成式', translated)
 
-    # If translation made it worse (too many fragments), return original
-    chinese_ratio = len(re.findall(r'[\u4e00-\u9fff]', translated)) / max(len(translated), 1)
-    if 0.1 < chinese_ratio < 0.3:
-        # Partial translation, might be awkward - return original
-        return description
-
     return translated
 
 

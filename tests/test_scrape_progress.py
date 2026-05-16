@@ -4,7 +4,14 @@ import pytest
 from pathlib import Path
 import tempfile
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
+
+from click.testing import CliRunner
+
+from ai_scraper.cli import cli
+from ai_scraper.models.repository import Repository
 from ai_scraper.scrape_progress import ScrapeProgress
+from ai_scraper.storage.database import Database
 
 
 def test_save_and_load_progress():
@@ -85,3 +92,40 @@ def test_progress_timestamp_is_datetime():
 
         loaded = progress.load("test_query")
         assert isinstance(loaded["timestamp"], datetime)
+
+
+def test_scrape_creates_snapshots():
+    """Scraping should create star snapshots for trend analysis."""
+    mock_repos = [
+        Repository(
+            id=1,
+            name="repo",
+            full_name="test/repo",
+            description="AI repo",
+            stars=1000,
+            language="Python",
+            topics=["ai"],
+            created_at=datetime(2024, 1, 1),
+            updated_at=datetime(2024, 5, 1),
+            pushed_at=datetime(2024, 5, 1),
+            url="https://github.com/test/repo",
+        )
+    ]
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        with patch("ai_scraper.cli.GitHubClient") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.search_repositories = AsyncMock(return_value=mock_repos)
+            mock_client.close = AsyncMock()
+
+            result = runner.invoke(cli, ["scrape", "--max-results", "1", "--no-progress"])
+
+        assert result.exit_code == 0
+        db = Database(Path("data/ai_scraper.db"))
+        db.init_db()
+        snapshots = db.get_snapshots(1)
+        db.close()
+
+    assert len(snapshots) >= 1
+    assert snapshots[0]["stars"] == 1000

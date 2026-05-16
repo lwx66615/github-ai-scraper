@@ -3,6 +3,9 @@
 from datetime import datetime, timedelta
 
 from click.testing import CliRunner
+from unittest.mock import AsyncMock, patch
+
+from ai_scraper.models.repository import Repository
 
 from ai_scraper.cli import cli, parse_since_param
 
@@ -66,6 +69,39 @@ def test_trending_no_database():
 
         assert result.exit_code == 0
         assert "No database found" in result.output
+
+
+def test_scrape_respects_max_results():
+    """Test that scrape command respects --max-results parameter."""
+    runner = CliRunner()
+    mock_repos = [
+        Repository(
+            id=i + 1,
+            name=f"repo-{i}",
+            full_name=f"test/repo-{i}",
+            description="AI test repo",
+            stars=1000 + i,
+            language="Python",
+            topics=["ai"],
+            created_at=datetime(2024, 1, 1),
+            updated_at=datetime(2024, 5, 1),
+            pushed_at=datetime(2024, 5, 1),
+            url=f"https://github.com/test/repo-{i}",
+        )
+        for i in range(150)
+    ]
+
+    with runner.isolated_filesystem():
+        with patch("ai_scraper.cli.GitHubClient") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.search_repositories = AsyncMock(return_value=mock_repos)
+            mock_client.close = AsyncMock()
+
+            result = runner.invoke(cli, ["scrape", "--max-results", "30", "--no-progress"])
+
+    assert result.exit_code == 0
+    assert "30" in result.output
+    assert "AI repositories" in result.output
 
 
 class TestParseSinceParam:

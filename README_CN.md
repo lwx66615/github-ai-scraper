@@ -49,6 +49,12 @@ export GITHUB_TOKEN=your_token_here
 # 爬取 AI 仓库
 ai-scraper scrape
 
+# 从 GitLab 爬取
+ai-scraper scrape --platform gitlab
+
+# 从自托管 GitLab 爬取
+ai-scraper scrape --platform gitlab --gitlab-url https://your-gitlab.com/api/v4
+
 # 带进度条爬取
 ai-scraper scrape --progress
 
@@ -75,6 +81,11 @@ ai-scraper trending
 ai-scraper db export --format html --output index.html
 ai-scraper db export --format xlsx --output repos.xlsx
 ai-scraper db export --format rss --output feed.xml
+ai-scraper db export --format markdown --output repositories.md
+
+# 清理和优化数据库
+ai-scraper db clean --invalid
+ai-scraper db clean --vacuum
 
 # 启动 REST API 服务（带认证）
 ai-scraper serve --port 8080 --auth
@@ -94,6 +105,11 @@ ai-scraper db restore backup_file.db.gz
 ```yaml
 github:
   token: ${GITHUB_TOKEN}
+  cache_ttl: 3600
+
+gitlab:
+  token: ${GITLAB_TOKEN}  # 可选，用于 GitLab 爬取
+  base_url: https://gitlab.com/api/v4  # 或自托管 GitLab URL
   cache_ttl: 3600
 
 filter:
@@ -133,6 +149,8 @@ webhooks:
 | 命令 | 描述 |
 |---------|-------------|
 | `ai-scraper scrape` | 从 GitHub 爬取 AI 仓库 |
+| `ai-scraper scrape --platform gitlab` | 从 GitLab 爬取 |
+| `ai-scraper scrape --platform gitlab --gitlab-url URL` | 从自托管 GitLab 爬取 |
 | `ai-scraper scrape --concurrent` | 并发爬取，更快获取结果 |
 | `ai-scraper scrape --incremental` | 增量爬取（仅更新的仓库） |
 | `ai-scraper scrape --since 7d` | 爬取最近 7 天更新的仓库 |

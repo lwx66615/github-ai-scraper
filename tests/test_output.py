@@ -6,6 +6,32 @@ import tempfile
 
 from ai_scraper.models import Repository
 from ai_scraper.output import MarkdownExporter
+from ai_scraper.output.translator import translate_description
+
+
+def test_translate_preserves_proper_nouns():
+    """Proper nouns and technical terms should not be partially translated."""
+    result = translate_description("Your own personal AI assistant. Any OS. Any Platform.")
+
+    assert "个人 AI 助手" in result or "AI 助手" in result
+    assert "代理ic" not in result
+
+
+def test_translate_handles_technical_terms():
+    """Technical terms should be translated naturally."""
+    result = translate_description("A production-ready platform for LLM applications.")
+
+    assert "生产就绪" in result
+    assert "大语言模型" in result or "LLM" in result
+
+
+def test_translate_avoids_awkward_partial_translation():
+    """Awkward partial translations should be avoided."""
+    result = translate_description("The agent that grows with you")
+
+    assert len(result) > 0
+    assert "代理ic" not in result
+    assert "开发ment" not in result
 
 
 def create_test_repo(
@@ -68,9 +94,9 @@ class TestMarkdownExporter:
             result_path = exporter.export_repositories(repos)
             content = result_path.read_text(encoding="utf-8")
 
-            assert "# AI Repositories" in content
-            assert "**更新时间:**" in content
-            assert "**总计:**" in content
+            assert "# 🤖 AI 开源项目精选" in content
+            assert "更新时间" in content
+            assert "项目数量" in content
 
     def test_export_includes_table_headers(self):
         """Export should include table headers."""
@@ -82,11 +108,10 @@ class TestMarkdownExporter:
             result_path = exporter.export_repositories(repos)
             content = result_path.read_text(encoding="utf-8")
 
-            assert "| Name |" in content
-            assert "| Stars |" in content
-            assert "| Language |" in content
-            assert "| Description |" in content
-            assert "| URL |" in content
+            assert "统计概览" in content
+            assert "语言分布" in content
+            assert "Stars" in content
+            assert "标签" in content
 
     def test_export_includes_repository_data(self):
         """Export should include repository data in table."""
@@ -99,7 +124,7 @@ class TestMarkdownExporter:
             content = result_path.read_text(encoding="utf-8")
 
             assert "explosion/spaCy" in content
-            assert "33,557" in content
+            assert "33.6K" in content
             assert "Python" in content
             assert "Industrial-strength NLP" in content
             assert "https://github.com/explosion/spaCy" in content
@@ -118,7 +143,7 @@ class TestMarkdownExporter:
             result_path = exporter.export_repositories(repos)
             content = result_path.read_text(encoding="utf-8")
 
-            assert "**总计:** 3 个仓库" in content
+            assert "| " in content and " | 3 | " in content
             assert "repo1/test" in content
             assert "repo2/test" in content
             assert "repo3/test" in content
@@ -139,7 +164,7 @@ class TestMarkdownExporter:
             exporter = MarkdownExporter(output_dir)
 
             long_text = "This is a very long description that should be truncated because it exceeds the limit"
-            result = exporter._clean_description(long_text)
+            result = exporter._clean_description(long_text, max_len=50)
 
             assert len(result) == 53  # 50 chars + "..."
             assert result.endswith("...")
@@ -160,7 +185,7 @@ class TestMarkdownExporter:
             exporter = MarkdownExporter(output_dir)
 
             result = exporter._clean_description(None)
-            assert result == ""
+            assert result == "暂无描述"
 
     def test_custom_filename(self):
         """Should support custom filename."""
